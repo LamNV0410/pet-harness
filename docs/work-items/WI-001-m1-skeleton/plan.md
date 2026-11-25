@@ -1,5 +1,5 @@
 # WI-001 Plan
-Status: Execution — T1–T8 done (2026-11-25). T9 (tests) deferred by PO; T10 pending
+Status: Merged to main (PO, 2026-11-25). T9 tests and T10 release review NOT done
 
 - **Gate 2:** approved on 2026-11-25.
 - **PO direction, 2026-11-25:** build the structure now; tests are deferred.
@@ -90,3 +90,8 @@ Every AC from 1.1 to 7.3 is mapped to T2–T8 for implementation and to T9 for v
     - **No raw secrets stored:** neither the DB nor the log contains a raw `Password=` value.
   - **UI:** checked in the browser pane at `http://127.0.0.1:7420`. Projects lists both products. The Timeline shows live allow and deny events.
   - **Not verified:** the acceptance criteria have no automated tests (T9 is deferred), and AC-7.3 (auto-reconnect after a restart) has not been checked by hand.
+- **Merged to `main` (fast-forward to `c950911`) on the PO's direct instruction, 2026-11-25** ("Merge vào main rồi làm M2").
+  - This counts as the gate-4 approval for this merge.
+  - The **T10 release review (`release-review` skill) was not run**. T9 tests are still deferred.
+  - WI-001's acceptance criteria are therefore smoke-tested only.
+  - The `/fw:*` commands and skills were not available in this session, because it was opened at the `Furwatch/` root rather than in `harness/`.
