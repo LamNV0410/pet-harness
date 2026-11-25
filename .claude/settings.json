@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "additionalDirectories": [
+      "../furwatch-api",
+      "../furwatch-app"
+    ],
+    "deny": [
+      "Read(//d/00000000000000000000000000000000000000000000/RFR/Furwatch/furwatch-api/**/appsettings*.json)",
+      "Read(//d/00000000000000000000000000000000000000000000/RFR/Furwatch/furwatch-api/**/ServiceAccounts/**)",
+      "Read(//d/00000000000000000000000000000000000000000000/RFR/Furwatch/furwatch-api/**/Keys/**)",
+      "Read(//d/00000000000000000000000000000000000000000000/RFR/Furwatch/furwatch-api/**/*.pubxml.user)",
+      "Read(//d/00000000000000000000000000000000000000000000/RFR/Furwatch/furwatch-api/**/bin/**)",
+      "Read(//d/00000000000000000000000000000000000000000000/RFR/Furwatch/furwatch-api/**/obj/**)",
+      "Read(//d/00000000000000000000000000000000000000000000/RFR/Furwatch/furwatch-app/**/google-services.json)",
+      "Read(//d/00000000000000000000000000000000000000000000/RFR/Furwatch/furwatch-app/**/GoogleService-Info*.plist)",
+      "Read(//d/00000000000000000000000000000000000000000000/RFR/Furwatch/furwatch-app/node_modules/**)",
+      "Read(**/appsettings*.json)",
+      "Read(**/ServiceAccounts/**)",
+      "Read(**/Keys/**)",
+      "Read(**/google-services.json)",
+      "Read(**/GoogleService-Info*.plist)",
+      "Read(**/.env)",
+      "Read(**/.env.*)"
+    ],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(git merge:*)",
+      "Bash(git tag:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(npm install:*)",
+      "Bash(dotnet add:*)",
+      "Bash(dotnet ef database update:*)",
+      "Bash(dotnet run:*)"
+    ]
+  }
+}

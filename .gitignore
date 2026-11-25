@@ -1,0 +1,23 @@
+# Harness local runtime data (database, logs, worktrees, env profiles, session token) — never commit
+.harness/
+
+# Dependencies and build output
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Test output
+test-results/
+playwright-report/
+
+# Secrets and local settings
+.env
+.env.*
+.claude/settings.local.json
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.log
