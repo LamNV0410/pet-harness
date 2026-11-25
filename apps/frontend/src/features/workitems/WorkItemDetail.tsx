@@ -4,23 +4,25 @@
 // Route: #wi/<id>/<tab>. Without a tab, the page for the current stage opens.
 
 import type { Stage } from "@harness/shared";
-import { STAGES, workflowContracts as wc } from "@harness/shared";
+import { workflowContracts as wc } from "@harness/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
 import { call, contracts } from "../../api/client";
 import { Markdown } from "../../components/Markdown";
 import { ago, Panel, StatePill } from "../../components/ui";
 import { RunTable } from "../projects/ProjectDetail";
+import { Stepper } from "./Stepper";
 
 type Detail = Awaited<ReturnType<typeof call<typeof wc.getWorkItem>>>;
 type Artifact = Detail["artifacts"][number];
 type AgentRun = Detail["agentRuns"][number];
-type Tab = "overview" | "brief" | "design" | "build" | "verify";
+type Tab = "overview" | "brief" | "design" | "tasks" | "build" | "verify";
 
 const TABS: { key: Tab; label: string; role: string }[] = [
   { key: "overview", label: "Overview", role: "PO" },
   { key: "brief", label: "Requirement", role: "BA" },
   { key: "design", label: "Design", role: "Architect" },
+  { key: "tasks", label: "Tasks", role: "Architect" },
   { key: "build", label: "Build", role: "BE / FE" },
   { key: "verify", label: "Verify", role: "Tester" },
 ];
@@ -65,7 +67,6 @@ export function WorkItemDetail({ id, tab }: { id: string; tab?: string | undefin
   if (!q.data) return <p className="sub">Loading…</p>;
   const d = q.data;
   const { workItem: w, pendingApprovalId } = d;
-  const stageIdx = STAGES.indexOf(w.stage);
   const current = asTab(tab) ?? TAB_OF_STAGE[w.stage];
   const gateTab = TAB_OF_STAGE[w.stage];
 
@@ -82,16 +83,7 @@ export function WorkItemDetail({ id, tab }: { id: string; tab?: string | undefin
           </h2>
           <StatePill state={w.status} />
         </div>
-        <ol className="track">
-          {STAGES.filter((s) => s !== "cancelled").map((s, i) => (
-            <li
-              key={s}
-              className={i < stageIdx || w.stage === "done" ? "past" : s === w.stage ? "now" : ""}
-            >
-              {s}
-            </li>
-          ))}
-        </ol>
+        <Stepper id={w.id} stage={w.stage} status={w.status} current={current} />
         {!pendingApprovalId && w.note && w.status === "blocked" && (
           <div className="gatebox blocked">
             <span>
@@ -169,10 +161,9 @@ export function WorkItemDetail({ id, tab }: { id: string; tab?: string | undefin
           kinds={(k) => k === "design"}
           roles={["architect"]}
           empty="The Architect starts after you approve the requirement (gate 1)."
-        >
-          <TaskTable d={d} />
-        </RolePage>
+        />
       )}
+      {current === "tasks" && <TasksPage d={d} />}
       {current === "build" && (
         <RolePage
           d={d}
@@ -207,6 +198,7 @@ function countFor(tab: Tab, d: Detail): number {
   const a = d.artifacts;
   if (tab === "brief") return a.filter((x) => x.kind === "brief").length;
   if (tab === "design") return a.filter((x) => x.kind === "design").length;
+  if (tab === "tasks") return d.tasks.length;
   if (tab === "build") return a.filter((x) => x.kind.startsWith("report-")).length + d.tasks.length;
   if (tab === "verify") return a.filter((x) => x.kind === "verification").length + d.runs.length;
   return 1;
@@ -481,5 +473,49 @@ function DiffPanel({ id, hasTasks }: { id: string; hasTasks: boolean }) {
           <p className="pad sub">{diff.isPending ? "Loading changes…" : "No code changes yet."}</p>
         ))}
     </Panel>
+  );
+}
+
+/** Tasks page: one card per task from the Architect's plan, details as markdown. */
+function TasksPage({ d }: { d: Detail }) {
+  if (!d.tasks.length) {
+    return (
+      <p className="pad sub empty-page">
+        The Architect writes the tasks together with the design (before gate 2).
+      </p>
+    );
+  }
+  const byStatus = d.tasks.reduce<Record<string, number>>((m, t) => {
+    m[t.status] = (m[t.status] ?? 0) + 1;
+    return m;
+  }, {});
+  return (
+    <>
+      <p className="sub task-sum">
+        {d.tasks.length} tasks ·{" "}
+        {Object.entries(byStatus)
+          .map(([s, n]) => `${n} ${s}`)
+          .join(" · ")}{" "}
+        · run in order, one branch each
+      </p>
+      {d.tasks.map((t, i) => (
+        <section key={t.id} className="panel task-card">
+          <header>
+            <span className="task-no">{i + 1}</span>
+            <div className="task-title">
+              <b>{t.title}</b>
+              <span className="sub mono">
+                {t.id} · {t.projectId}
+                {t.branch ? ` · ${t.branch}` : ""}
+                {t.commit ? ` @ ${t.commit.slice(0, 8)}` : ""}
+              </span>
+            </div>
+            <span className={`owner owner-${t.owner}`}>{t.owner.toUpperCase()}</span>
+            <StatePill state={t.status} />
+          </header>
+          <Markdown text={t.details} />
+        </section>
+      ))}
+    </>
   );
 }

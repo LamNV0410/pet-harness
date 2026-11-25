@@ -22,7 +22,7 @@ const out = (o) => process.stdout.write(`${JSON.stringify(o)}\n`);
 let prompt = "";
 for await (const c of process.stdin) prompt += c;
 
-out({ type: "system", subtype: "init", model: "fake-claude", session_id: sessionId });
+out({ type: "system", subtype: "init", model: `fake-${opt("--model")}`, session_id: sessionId });
 
 async function callTool(name, input) {
   out({

@@ -44,6 +44,25 @@ export function claudeBin(env: NodeJS.ProcessEnv = process.env): string | null {
   return candidates.find((p) => existsSync(p)) ?? null;
 }
 
+/** Model and effort per role (PO, 2026-11-26). Override with HARNESS_MODEL_<ROLE> / HARNESS_EFFORT_<ROLE>. */
+export const ROLE_MODELS: Record<AgentRole, { model: string; effort: string }> = {
+  ba: { model: "opus", effort: "low" },
+  architect: { model: "opus", effort: "medium" },
+  be: { model: "sonnet", effort: "medium" },
+  fe: { model: "sonnet", effort: "medium" },
+  tester: { model: "sonnet", effort: "medium" },
+  release: { model: "sonnet", effort: "medium" },
+};
+
+export function roleModel(role: AgentRole, env: NodeJS.ProcessEnv = process.env) {
+  const key = role.toUpperCase();
+  const base = ROLE_MODELS[role] ?? { model: "sonnet", effort: "medium" };
+  return {
+    model: env[`HARNESS_MODEL_${key}`] ?? base.model,
+    effort: env[`HARNESS_EFFORT_${key}`] ?? base.effort,
+  };
+}
+
 export class AgentExecutor {
   private readonly running = new Map<string, number>();
 
@@ -145,7 +164,8 @@ export class AgentExecutor {
       o.tools.join(","),
       ...o.addDirs.flatMap((d) => ["--add-dir", d]),
     ];
-    if (process.env.HARNESS_AGENT_MODEL) args.push("--model", process.env.HARNESS_AGENT_MODEL);
+    const { model, effort } = roleModel(o.role);
+    args.push("--model", model, "--effort", effort);
 
     return new Promise<ExecResult>((resolve) => {
       // A .mjs/.js "CLI" (the fake executor in scripts/) runs under this Node.
@@ -182,7 +202,7 @@ export class AgentExecutor {
             o.workItemId,
             o.role,
             "info",
-            `session started (${String(msg.model ?? "model")})`,
+            `session started (${String(msg.model ?? "model")}, effort ${roleModel(o.role).effort})`,
           );
         } else if (type === "assistant") {
           const content = ((msg.message as { content?: unknown[] } | undefined)?.content ??
