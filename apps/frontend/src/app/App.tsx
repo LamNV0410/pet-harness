@@ -1,44 +1,89 @@
-// App shell with hash routes. Views are added per milestone.
+// App shell with hash routes: Dashboard, Inbox, Kanban, Approvals, Office, Projects, Runtime, Timeline.
 import type { HarnessEvent } from "@harness/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { call, contracts } from "../api/client";
+import { AgentRunDetail } from "../features/agents/AgentRunDetail";
 import { ApprovalsView } from "../features/approvals/ApprovalsView";
+import { DashboardView } from "../features/dashboard/DashboardView";
+import { OfficeView } from "../features/office/OfficeView";
 import { ProjectDetail } from "../features/projects/ProjectDetail";
 import { ProjectsView } from "../features/projects/ProjectsView";
 import { RunDetail } from "../features/runs/RunDetail";
+import { RuntimeView } from "../features/runtime/RuntimeView";
 import { TimelineView } from "../features/timeline/TimelineView";
+import { InboxView } from "../features/workitems/InboxView";
+import { KanbanView } from "../features/workitems/KanbanView";
+import { WorkItemDetail } from "../features/workitems/WorkItemDetail";
 import { useEventStream } from "../state/useEventStream";
 
-type Route =
-  | { view: "projects" }
-  | { view: "project"; id: string }
-  | { view: "run"; id: string }
-  | { view: "approvals" }
-  | { view: "timeline" };
+type View =
+  | "dashboard"
+  | "inbox"
+  | "kanban"
+  | "approvals"
+  | "office"
+  | "projects"
+  | "runtime"
+  | "timeline"
+  | "project"
+  | "run"
+  | "wi"
+  | "agent";
 
-function parse(hash: string): Route {
-  const h = hash.replace(/^#/, "");
-  const [head, id] = h.split("/");
-  if (head === "project" && id) return { view: "project", id };
-  if (head === "run" && id) return { view: "run", id };
-  if (head === "approvals") return { view: "approvals" };
-  if (head === "timeline") return { view: "timeline" };
-  return { view: "projects" };
+interface Route {
+  view: View;
+  id?: string;
 }
 
-const NAV: { key: Route["view"]; label: string; href: string }[] = [
-  { key: "projects", label: "Projects", href: "#projects" },
-  { key: "approvals", label: "Approvals", href: "#approvals" },
-  { key: "timeline", label: "Timeline", href: "#timeline" },
+const SIMPLE: View[] = [
+  "dashboard",
+  "inbox",
+  "kanban",
+  "approvals",
+  "office",
+  "projects",
+  "runtime",
+  "timeline",
+];
+function parse(hash: string): Route {
+  const [head, id] = hash.replace(/^#/, "").split("/");
+  if (head && id && ["project", "run", "wi", "agent"].includes(head))
+    return { view: head as View, id };
+  return { view: SIMPLE.includes(head as View) ? (head as View) : "dashboard" };
+}
+
+const NAV: { key: View; label: string }[] = [
+  { key: "dashboard", label: "Dashboard" },
+  { key: "inbox", label: "Requirement Inbox" },
+  { key: "kanban", label: "Kanban" },
+  { key: "approvals", label: "Approvals" },
+  { key: "office", label: "Virtual Office" },
+  { key: "projects", label: "Projects" },
+  { key: "runtime", label: "Runtime" },
+  { key: "timeline", label: "Timeline" },
 ];
 
-const TITLES: Record<Route["view"], string> = {
+const TITLE: Record<View, string> = {
+  dashboard: "Dashboard",
+  inbox: "Requirement Inbox",
+  kanban: "Kanban",
+  approvals: "Approval Center",
+  office: "Virtual Office",
   projects: "Projects",
+  runtime: "Runtime",
+  timeline: "Timeline",
   project: "Project",
   run: "Run",
-  approvals: "Approval Center",
-  timeline: "Timeline",
+  wi: "Work item",
+  agent: "Agent run",
+};
+
+const PARENT: Partial<Record<View, View>> = {
+  project: "projects",
+  run: "projects",
+  wi: "kanban",
+  agent: "kanban",
 };
 
 export function App() {
@@ -56,8 +101,23 @@ export function App() {
     if (e.type === "run.state_changed") {
       void qc.invalidateQueries({ queryKey: ["runs"] });
       void qc.invalidateQueries({ queryKey: ["run", e.payload.runId] });
+      void qc.invalidateQueries({ queryKey: ["servers"] });
+      void qc.invalidateQueries({ queryKey: ["wi"] });
     }
-    if (e.type.startsWith("approval.")) void qc.invalidateQueries({ queryKey: ["approvals"] });
+    if (e.type.startsWith("approval.")) {
+      void qc.invalidateQueries({ queryKey: ["approvals"] });
+      void qc.invalidateQueries({ queryKey: ["wi"] });
+    }
+    if (e.type === "workitem.changed") {
+      void qc.invalidateQueries({ queryKey: ["workitems"] });
+      void qc.invalidateQueries({ queryKey: ["wi", e.payload.workItemId] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
+    }
+    if (e.type === "agent.activity") {
+      void qc.invalidateQueries({ queryKey: ["agent", e.payload.agentRunId] });
+      if (e.payload.workItemId)
+        void qc.invalidateQueries({ queryKey: ["wi", e.payload.workItemId] });
+    }
     if (e.type === "system.started") void qc.invalidateQueries();
   });
   const health = useQuery({
@@ -70,8 +130,8 @@ export function App() {
     queryFn: () => call(contracts.listApprovals),
   });
   const pendingCount = pending.data?.approvals.filter((a) => a.state === "pending").length ?? 0;
+  const active = PARENT[route.view] ?? route.view;
 
-  const activeNav = route.view === "project" || route.view === "run" ? "projects" : route.view;
   return (
     <div className="shell">
       <nav className="rail" aria-label="Views">
@@ -80,7 +140,7 @@ export function App() {
           Furwatch Harness
         </div>
         {NAV.map((n) => (
-          <a key={n.key} href={n.href} aria-current={activeNav === n.key ? "page" : undefined}>
+          <a key={n.key} href={`#${n.key}`} aria-current={active === n.key ? "page" : undefined}>
             {n.label}
             {n.key === "approvals" && pendingCount > 0 && (
               <span className="badge">{pendingCount}</span>
@@ -91,7 +151,7 @@ export function App() {
       </nav>
       <main>
         <div className="topbar">
-          <h1>{TITLES[route.view]}</h1>
+          <h1>{TITLE[route.view]}</h1>
           <div className="chips">
             <span className={`chip ${status === "open" ? "live" : "warn"}`}>
               {status === "open"
@@ -105,11 +165,18 @@ export function App() {
             </span>
           </div>
         </div>
-        {route.view === "projects" && <ProjectsView />}
-        {route.view === "project" && <ProjectDetail projectId={route.id} />}
-        {route.view === "run" && <RunDetail runId={route.id} />}
+        {route.view === "dashboard" && <DashboardView />}
+        {route.view === "inbox" && <InboxView />}
+        {route.view === "kanban" && <KanbanView />}
         {route.view === "approvals" && <ApprovalsView />}
+        {route.view === "office" && <OfficeView events={events} />}
+        {route.view === "projects" && <ProjectsView />}
+        {route.view === "runtime" && <RuntimeView />}
         {route.view === "timeline" && <TimelineView events={events} />}
+        {route.view === "project" && route.id && <ProjectDetail projectId={route.id} />}
+        {route.view === "run" && route.id && <RunDetail runId={route.id} />}
+        {route.view === "wi" && route.id && <WorkItemDetail id={route.id} />}
+        {route.view === "agent" && route.id && <AgentRunDetail id={route.id} />}
       </main>
     </div>
   );
