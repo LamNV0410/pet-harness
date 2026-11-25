@@ -1,4 +1,5 @@
 # Project adapter for furwatch-app (blueprint 04 §5, D1 = origin/dev_v3). Only glob patterns, no secret values.
+# Angular 18 needs Node <= 22, so npm/npx run with the system Node (toolchain: node-system).
 id: furwatch-app
 name: furwatch-app
 path: ../furwatch-app
@@ -15,10 +16,16 @@ generated:
   - "www/**"
   - "**/dist/**"
 commands:
-  build: { argv: [npm, run, build] }
-  test: { argv: [npx, ng, test, --watch=false, --browsers=ChromeHeadless] }
-  lint: { argv: [npm, run, lint] }
-  install: { argv: [npm, install, --legacy-peer-deps], approval: ask }
-  run: { argv: [npm, run, dev], approval: ask, port: 4200 }
+  install:
+    {
+      argv: [npm, install, --legacy-peer-deps, --no-audit, --no-fund],
+      approval: ask,
+      toolchain: node-system,
+      timeoutMinutes: 30,
+    }
+  build: { argv: [npm, run, build], toolchain: node-system, timeoutMinutes: 30 }
+  lint: { argv: [npm, run, lint], toolchain: node-system }
+  test: { argv: [npx, ng, test, --watch=false, --browsers=ChromeHeadless], toolchain: node-system }
+  run: { argv: [npm, run, dev], approval: ask, toolchain: node-system, port: 4200 }
 health:
   path: /

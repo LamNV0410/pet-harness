@@ -3,12 +3,16 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildApp } from "./api/index.js";
+import { runRoutes } from "./api/runs.js";
 import { loadOrCreateToken } from "./api/security.js";
+import { ApprovalService } from "./approvals/index.js";
 import { loadConfig } from "./config/index.js";
 import { Logger } from "./logger.js";
 import { PermissionEngine } from "./permissions/engine.js";
 import { redact } from "./permissions/redactor.js";
 import { ProjectRegistry } from "./projects/index.js";
+import { detectToolchains } from "./runtime/process.js";
+import { Runner } from "./runtime/runner.js";
 import { Store } from "./store/index.js";
 import { ToolService } from "./tools/service.js";
 
@@ -27,9 +31,22 @@ async function main(): Promise<void> {
   const projects = new ProjectRegistry(store, engine, config.adaptersDir, config.harnessRoot);
   const loaded = projects.load();
   const tools = new ToolService(store, engine, projects, logger);
+  const approvals = new ApprovalService(store);
+  approvals.expireAllPending();
+  const runner = new Runner(store, projects, approvals, logger, detectToolchains(), config.home);
+  runner.recover();
 
   let port = config.port;
-  const app = buildApp({ config, store, projects, tools, logger, token, port: () => port });
+  const app = buildApp({
+    config,
+    store,
+    projects,
+    tools,
+    logger,
+    token,
+    port: () => port,
+    modules: [runRoutes(runner, approvals)],
+  });
   await app.listen({ host: "127.0.0.1", port: config.port });
   const addr = app.server.address();
   if (addr && typeof addr === "object") port = addr.port;

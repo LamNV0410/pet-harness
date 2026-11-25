@@ -2,13 +2,14 @@
 // clear messages while the rest still load; a missing path makes the project "unavailable".
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { AdapterFile, type Project } from "@harness/shared";
+import { AdapterFile, type AdapterFile as AdapterFileT, type Project } from "@harness/shared";
 import { parse as parseYaml } from "yaml";
 import type { PermissionEngine, ProjectScope } from "../permissions/engine.js";
 import type { GlobSet } from "../permissions/glob.js";
 import type { Store } from "../store/index.js";
 
 interface Entry {
+  adapter: AdapterFileT;
   project: Project;
   root: string;
   secrets: GlobSet;
@@ -71,7 +72,12 @@ export class ProjectRegistry {
         secretPaths: a.secretPaths,
       };
       this.upsert(project);
-      this.entries.set(a.id, { project, root, secrets: this.engine.secretSetFor(a.secretPaths) });
+      this.entries.set(a.id, {
+        adapter: a,
+        project,
+        root,
+        secrets: this.engine.secretSetFor(a.secretPaths),
+      });
     }
     if (rejected.length) {
       this.store.transaction((tx) => {
@@ -135,6 +141,10 @@ export class ProjectRegistry {
 
   list(): Project[] {
     return [...this.entries.values()].map((e) => e.project);
+  }
+
+  adapter(id: string): AdapterFileT | undefined {
+    return this.entries.get(id)?.adapter;
   }
 
   scope(id: string): ProjectScope | undefined {

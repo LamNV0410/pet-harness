@@ -1,40 +1,48 @@
-// Projects view (AC-7.1): managed repos, base ref, availability, secret paths (never readable).
+// Projects list + latest verification per project (M1 + M2).
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "../../api/client";
+import { call, contracts } from "../../api/client";
+import { ago, go, Panel, StatePill } from "../../components/ui";
 
 export function ProjectsView() {
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ["projects"], queryFn: api.projects });
+  const q = useQuery({ queryKey: ["projects"], queryFn: () => call(contracts.listProjects) });
+  const runs = useQuery({
+    queryKey: ["runs"],
+    queryFn: () => call(contracts.listRuns, { query: { limit: 100 } }),
+  });
   const reload = useMutation({
-    mutationFn: api.reloadProjects,
+    mutationFn: () => call(contracts.reloadProjects),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["projects"] }),
   });
 
+  const latest = (projectId: string, commandId: string) =>
+    runs.data?.runs.find(
+      (r) =>
+        r.projectId === projectId &&
+        r.commandId === commandId &&
+        ["passed", "failed", "cached"].includes(r.state),
+    );
+
   return (
-    <section className="panel">
-      <div className="panel-h">
-        <h2>Managed projects</h2>
-        <div className="row-gap">
-          <span className="sub">from adapters/*.yaml · read-only</span>
+    <Panel
+      title="Managed projects"
+      actions={
+        <>
+          <span className="sub">from adapters/*.yaml</span>
           <button type="button" onClick={() => reload.mutate()} disabled={reload.isPending}>
             {reload.isPending ? "Reloading…" : "Reload adapters"}
           </button>
-        </div>
-      </div>
+        </>
+      }
+    >
       {q.isPending && <p className="pad sub">Loading projects…</p>}
       {q.isError && (
         <p className="pad error">Could not load projects: {(q.error as Error).message}</p>
       )}
       {reload.data && reload.data.rejected.length > 0 && (
         <div className="pad error">
-          Rejected adapters:
-          <ul>
-            {reload.data.rejected.map((r) => (
-              <li key={r.file}>
-                <code>{r.file}</code>: {r.errors.join("; ")}
-              </li>
-            ))}
-          </ul>
+          Rejected adapters:{" "}
+          {reload.data.rejected.map((r) => `${r.file}: ${r.errors.join("; ")}`).join(" · ")}
         </div>
       )}
       {q.data && (
@@ -45,23 +53,42 @@ export function ProjectsView() {
                 <th>Project</th>
                 <th>Base ref</th>
                 <th>Status</th>
+                <th>Last build</th>
+                <th>Last test</th>
                 <th>Secret paths (never readable)</th>
               </tr>
             </thead>
             <tbody>
               {q.data.projects.map((p) => (
-                <tr key={p.id}>
+                <tr key={p.id} className="clickable" onClick={() => go(`project/${p.id}`)}>
                   <td>
-                    <b>{p.name}</b>
+                    <a href={`#project/${p.id}`}>
+                      <b>{p.name}</b>
+                    </a>
                     <div className="sub mono">{p.path}</div>
                   </td>
                   <td className="mono">{p.baseRef}</td>
                   <td>
-                    <span className={`pill ${p.status === "available" ? "ok" : "bad"}`}>
-                      {p.status}
-                    </span>
+                    <StatePill state={p.status} />
                     {p.reason && <div className="sub">{p.reason}</div>}
                   </td>
+                  {(["build", "test"] as const).map((c) => {
+                    const r = latest(p.id, c);
+                    return (
+                      <td key={c}>
+                        {r ? (
+                          <>
+                            <StatePill state={r.state} />
+                            <div className="sub mono">
+                              {r.sha?.slice(0, 7)} · {ago(r.finishedAt)}
+                            </div>
+                          </>
+                        ) : (
+                          <span className="sub">not run</span>
+                        )}
+                      </td>
+                    );
+                  })}
                   <td>
                     <div className="globs">
                       {p.secretPaths.map((s) => (
@@ -71,17 +98,10 @@ export function ProjectsView() {
                   </td>
                 </tr>
               ))}
-              {q.data.projects.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="sub">
-                    No projects registered. Add an adapter file under adapters/.
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
       )}
-    </section>
+    </Panel>
   );
 }

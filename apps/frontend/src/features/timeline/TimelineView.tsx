@@ -19,6 +19,16 @@ function summary(e: HarnessEvent): string {
       return e.payload.tool;
     case "tool.finished":
       return `${e.payload.tool} ${e.payload.ok ? "ok" : `failed: ${e.payload.error ?? ""}`} · ${e.payload.durationMs} ms · ${e.payload.outputBytes} B${e.payload.filtered ? " · secrets withheld" : ""}`;
+    case "run.state_changed":
+      return `${e.payload.projectId} ${e.payload.commandId} → ${e.payload.state.replace(/_/g, " ")}${e.payload.sha ? ` @ ${e.payload.sha.slice(0, 7)}` : ""}${e.payload.summary ? ` · ${e.payload.summary}` : ""}`;
+    case "approval.requested":
+      return `waiting for PO: ${e.payload.title}`;
+    case "approval.decided":
+      return `${e.payload.decision.toUpperCase()} · ${e.payload.title}`;
+    case "agent.activity":
+      return `${e.payload.role}${e.payload.workItemId ? ` · ${e.payload.workItemId}` : ""} · ${e.payload.state} · ${e.payload.text}`;
+    case "workitem.changed":
+      return `${e.payload.workItemId} "${e.payload.title}" → ${e.payload.stage} (${e.payload.status})`;
   }
 }
 
@@ -26,6 +36,12 @@ function tone(e: HarnessEvent): string {
   if (e.type === "tool.decided") return e.payload.decision === "deny" ? "deny" : "allow";
   if (e.type === "adapter.rejected") return "deny";
   if (e.type === "tool.finished" && !e.payload.ok) return "deny";
+  if (e.type === "run.state_changed") {
+    if (["failed", "error", "timed_out", "denied"].includes(e.payload.state)) return "deny";
+    if (e.payload.state === "passed") return "allow";
+  }
+  if (e.type === "approval.requested") return "ask";
+  if (e.type === "approval.decided") return e.payload.decision === "approved" ? "allow" : "deny";
   return "";
 }
 

@@ -29,6 +29,13 @@ export interface AppDeps {
   token: string;
   /** Actual listening port (known after listen when HARNESS_PORT=0). */
   port: () => number;
+  /** Feature route modules (runs, approvals, agents, workflow, runtime). */
+  modules?: ReadonlyArray<(kit: RouteKit) => void>;
+}
+
+export interface RouteKit {
+  route: (c: ContractDef, handler: RouteHandlerMethod) => void;
+  fail: typeof fail;
 }
 
 const STATUS: Record<ErrorCode, number> = {
@@ -50,7 +57,7 @@ const MIME: Record<string, string> = {
   ".json": "application/json",
 };
 
-function fail(reply: FastifyReply, code: ErrorCode, message: string, details?: unknown) {
+export function fail(reply: FastifyReply, code: ErrorCode, message: string, details?: unknown) {
   return reply
     .code(STATUS[code])
     .type("application/json")
@@ -83,7 +90,8 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     if (!req.url.startsWith("/api/")) return; // static UI is served without a token
     const auth = req.headers.authorization;
     let given = auth?.startsWith("Bearer ") ? auth.slice(7) : undefined;
-    if (given === undefined && req.url.startsWith(`${contracts.eventStream.path}`)) {
+    const pathOnly = req.url.split("?")[0] ?? "";
+    if (given === undefined && pathOnly.endsWith("/stream")) {
       given = (req.query as { token?: string }).token;
     }
     if (!tokenMatches(token, given))
@@ -168,6 +176,8 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         );
     }
   });
+
+  for (const m of deps.modules ?? []) m({ route, fail });
 
   // ---- Static UI with the session token injected (design.md §5.1) --------------------------
   app.setNotFoundHandler((req, reply) => {
