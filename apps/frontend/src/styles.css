@@ -767,3 +767,95 @@ pre.md {
 .l-done::before {
   background: var(--ok);
 }
+.md {
+  padding: 4px 16px 14px;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  max-width: 78ch;
+}
+.md h2,
+.md h3,
+.md h4,
+.md h5,
+.md h6 {
+  margin: 18px 0 6px;
+  line-height: 1.3;
+}
+.md h2 {
+  font-size: 18px;
+}
+.md h3 {
+  font-size: 15.5px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+.md h4,
+.md h5,
+.md h6 {
+  font-size: 14px;
+  color: var(--muted);
+}
+.md p {
+  margin: 8px 0;
+}
+.md ul,
+.md ol {
+  margin: 6px 0 10px;
+  padding-left: 22px;
+}
+.md li {
+  margin: 3px 0;
+}
+.md li > ul,
+.md li > ol {
+  margin: 3px 0;
+}
+.md code {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--accent-soft);
+}
+.md pre.md-code {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow-x: auto;
+  background: var(--bg);
+}
+.md pre.md-code code {
+  padding: 0;
+  background: none;
+}
+.md blockquote {
+  margin: 10px 0;
+  padding: 4px 12px;
+  border-left: 3px solid var(--accent);
+  color: var(--muted);
+}
+.md hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 16px 0;
+}
+.md-table {
+  overflow-x: auto;
+  margin: 10px 0;
+}
+.md table {
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.md th,
+.md td {
+  border: 1px solid var(--line);
+  padding: 5px 9px;
+  text-align: left;
+  vertical-align: top;
+}
+.md th {
+  background: var(--bg);
+}

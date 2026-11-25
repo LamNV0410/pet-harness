@@ -1,7 +1,9 @@
 // One agent run: live activity (tool calls, denials, messages) and the final report.
+
 import { workflowContracts as wc } from "@harness/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { call } from "../../api/client";
+import { Markdown } from "../../components/Markdown";
 import { Panel, StatePill } from "../../components/ui";
 
 export function AgentRunDetail({ id }: { id: string }) {
@@ -80,7 +82,7 @@ export function AgentRunDetail({ id }: { id: string }) {
       </Panel>
       {output && (
         <Panel title="Final report">
-          <pre className="md">{output}</pre>
+          <Markdown text={output} />
         </Panel>
       )}
     </div>
