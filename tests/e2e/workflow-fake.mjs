@@ -2,8 +2,9 @@
 // with the fake Claude executor (scripts/fake-claude.mjs). Also checks the PreToolUse hook
 // fails closed (unknown run, secret path) and that every agent tool call is audited.
 // Usage: node tests/e2e/workflow-fake.mjs   (after `pnpm build`). Uses a temp HARNESS_HOME.
-// Side effect: a local task branch fw/wi-001-t1 in ../furwatch-api (never pushed).
-import { spawn } from "node:child_process";
+// Task branches get a unique prefix (fw-e2e-<id>/) so they never touch real fw/* branches;
+// the test removes its own worktrees and branches at the end. Nothing is pushed.
+import { execFileSync, spawn } from "node:child_process";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -12,6 +13,7 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const home = mkdtempSync(join(tmpdir(), "harness-e2e-"));
 const port = 7499;
+const prefix = `fw-e2e-${Date.now().toString(36)}/`;
 const base = `http://127.0.0.1:${port}`;
 const proc = spawn(process.execPath, [join(root, "apps/backend/dist/main.js")], {
   env: {
@@ -19,6 +21,7 @@ const proc = spawn(process.execPath, [join(root, "apps/backend/dist/main.js")], 
     HARNESS_HOME: home,
     HARNESS_PORT: String(port),
     HARNESS_CLAUDE_BIN: join(root, "scripts/fake-claude.mjs"),
+    HARNESS_BRANCH_PREFIX: prefix,
   },
   stdio: ["ignore", "pipe", "pipe"],
 });
@@ -172,7 +175,33 @@ try {
   check("workflow", false, e.message);
 } finally {
   proc.kill();
+  await new Promise((r) => proc.once("exit", r));
+  cleanupRepos();
 }
 const failed = results.filter((r) => !r.ok).length;
 console.log(`\n${results.length - failed}/${results.length} passed (HARNESS_HOME=${home})`);
 process.exit(failed ? 1 : 0);
+
+/** Removes this run's worktrees (under its temp HARNESS_HOME) and its fw-e2e-* branches. */
+function cleanupRepos() {
+  for (const repo of ["furwatch-api", "furwatch-app"].map((p) => resolve(root, "..", p))) {
+    const g = (...a) => execFileSync("git", ["-C", repo, ...a], { encoding: "utf8" });
+    try {
+      const homeFwd = home.replace(/\\/g, "/").toLowerCase();
+      for (const line of g("worktree", "list", "--porcelain").split("\n")) {
+        const wt = line.startsWith("worktree ") ? line.slice(9).trim() : "";
+        if (wt && wt.replace(/\\/g, "/").toLowerCase().startsWith(homeFwd)) {
+          g("worktree", "remove", "--force", wt);
+        }
+      }
+      g("worktree", "prune");
+      const branches = g("branch", "--list", `${prefix}*`, "--format=%(refname:short)")
+        .split("\n")
+        .filter(Boolean);
+      for (const b of branches) g("branch", "-D", b);
+      if (branches.length) console.log(`cleanup: ${repo} removed ${branches.join(", ")}`);
+    } catch (e) {
+      console.log(`cleanup warning (${repo}): ${e.message.split("\n")[0]}`);
+    }
+  }
+}
