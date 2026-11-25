@@ -28,3 +28,23 @@ The Owner prepares the options. The PO decides. Reviewed 2026-11-25 for Technica
 | D13 | Source of truth: the database for workflow state, Markdown for artifacts, plus an event log | Architect | **ACCEPTED** (PO, gate 2, 2026-11-25) (TD-08) | M1 (schema), M5 | New in v0.2 |
 | D14 | Virtual Office rendering technology | Architect / PO | **ACCEPTED** (PO, gate 2, 2026-11-25): DOM/SVG first (TD-11) | M5 | New in v0.2 |
 | D15 | Cost policy values: model tier per role, budgets per run and per day, concurrency limits, retention | PO | **OPEN** (values) · mechanism ACCEPTED in TD-09 | M3 | New in v0.2 |
+
+## Standing delegation (PO, 2026-11-25)
+The PO said "làm full từ M1 tới M6 đi. ko cần tôi approve những cái vớ vẩn" (build M1 to M6 in full; don't ask me to approve trivial things) and wants to see the UI when it is done.
+
+**The Orchestrator may proceed without asking:**
+- Gates 1–3 for the Harness milestones M2–M6. Each milestone gets one short design note in its work-item folder.
+- Installing npm packages for the Harness that fit the accepted stack (TD-01).
+- Local commits and merges in the **harness** repository.
+- Installing the official Claude Code CLI (approved by the PO).
+
+**Still needs the PO every time:**
+- Each start of `furwatch-api` on the dev/test database (TD-13; reconfirmed by the PO).
+- Any push to a remote.
+- Any write or merge in the product repositories' shared branches.
+- `npm install` for furwatch-app. This is an `approval: ask` adapter command, approved in the UI.
+- Deleting data.
+
+**Also decided:**
+- **D2:** postponed by the PO, who accepts relying on secret-path denial plus redaction until then.
+- **Harness self-tests:** stay deferred (PO).
