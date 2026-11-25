@@ -59,9 +59,9 @@ ${brief}
 Write a short design note (approach, files/modules to change with paths, contract or schema impact, risks).
 Then end your report with exactly one fenced block tagged harness-tasks containing JSON:
 \`\`\`harness-tasks
-[{"owner":"be"|"fe","projectId":"${projectId}","title":"...","details":"what to change, which files, acceptance criteria covered"}]
+[{"owner":"be"|"fe","projectId":"furwatch-api"|"furwatch-app","title":"...","details":"- what to change\\n- which files\\n- tests\\n- acceptance criteria covered"}]
 \`\`\`
-Use owner "be" for furwatch-api work and "fe" for furwatch-app work. Prefer 1-3 tasks.`;
+Use owner "be" with projectId "furwatch-api" and owner "fe" with projectId "furwatch-app" (the work item is for ${projectId}). Write "details" as a short markdown list (one point per line, joined with \\n), not one long paragraph. Prefer 1-3 tasks.`;
 }
 
 export function implementPrompt(
@@ -87,6 +87,25 @@ ${design}
 Finish with a short report: files changed and why, acceptance criteria covered, anything not done.`;
 }
 
+/** Models sometimes put real line breaks inside JSON strings; escape them so JSON.parse accepts it. */
+function escapeRawNewlines(json: string): string {
+  let out = "";
+  let inString = false;
+  for (let i = 0; i < json.length; i++) {
+    const c = json[i] as string;
+    if (inString && c === "\\") {
+      out += c + (json[++i] ?? "");
+      continue;
+    }
+    if (c === '"') inString = !inString;
+    if (inString && c === "\n") out += "\\n";
+    else if (inString && c === "\r") continue;
+    else if (inString && c === "\t") out += "\\t";
+    else out += c;
+  }
+  return out;
+}
+
 /** Extracts the harness-tasks JSON block from an Architect report. */
 export function parseTasks(
   text: string,
@@ -94,13 +113,14 @@ export function parseTasks(
   const m = /```harness-tasks\s*([\s\S]*?)```/.exec(text);
   if (!m?.[1]) return [];
   try {
-    const arr = JSON.parse(m[1]) as unknown;
+    const arr = JSON.parse(escapeRawNewlines(m[1])) as unknown;
     if (!Array.isArray(arr)) return [];
     return arr
       .filter((t): t is Record<string, unknown> => !!t && typeof t === "object")
       .map((t) => ({
         owner: t.owner === "fe" ? "fe" : "be",
-        projectId: String(t.projectId ?? ""),
+        // FE work lives in furwatch-app, BE work in furwatch-api, whatever the model wrote.
+        projectId: t.owner === "fe" ? "furwatch-app" : "furwatch-api",
         title: String(t.title ?? "task").slice(0, 200),
         details: String(t.details ?? "").slice(0, 8000),
       }));

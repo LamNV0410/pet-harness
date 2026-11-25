@@ -1287,3 +1287,214 @@ a:focus-visible .o-name {
   border-color: var(--bad);
   background: var(--bad-soft);
 }
+.task-sum {
+  margin: 0;
+}
+.task-card header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px 6px;
+}
+.task-no {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+}
+.task-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.owner {
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+}
+.owner-be {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.owner-fe {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+/* Work item stepper */
+.stepper {
+  position: relative;
+  margin: 6px 0 4px;
+  overflow-x: auto;
+  --st-size: 30px;
+}
+.stepper ol {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(9, minmax(76px, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.st-rail {
+  position: absolute;
+  top: calc(var(--st-size) / 2 - 2px);
+  left: calc(100% / 18);
+  right: calc(100% / 18);
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+}
+.st-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--ok);
+  transition: width 0.5s ease;
+}
+.st a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 0 2px 6px;
+  color: var(--fg);
+  text-decoration: none;
+  text-align: center;
+}
+.st-dot {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--st-size);
+  height: var(--st-size);
+  border: 2px solid var(--line);
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  transition: transform 0.15s ease;
+}
+.st-gate .st-dot {
+  width: calc(var(--st-size) - 8px);
+  height: calc(var(--st-size) - 8px);
+  margin: 4px 0;
+  border-radius: 4px;
+  transform: rotate(45deg);
+  font-size: 0;
+}
+.st-label {
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+.st-gate .st-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+.st-who {
+  font-size: 11px;
+  color: var(--muted);
+}
+.st a:hover .st-dot {
+  border-color: var(--accent);
+}
+.st-gate a:hover .st-dot {
+  transform: rotate(45deg) scale(1.1);
+}
+.st:not(.st-gate) a:hover .st-dot {
+  transform: scale(1.08);
+}
+.st-open .st-label {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+/* finished */
+.st-done .st-dot {
+  border-color: var(--ok);
+  background: var(--ok);
+  color: #fff;
+}
+.st-gate.st-done .st-dot {
+  font-size: 0;
+}
+/* current: agent working */
+.st-active .st-dot {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  animation: st-pulse 1.6s ease-out infinite;
+}
+.st-active .st-who {
+  color: var(--accent);
+  font-weight: 600;
+}
+/* current: waiting for the PO */
+.st-waiting .st-dot {
+  border-color: var(--warn);
+  background: var(--warn-soft);
+  color: var(--warn);
+  animation: st-pulse-warn 1.6s ease-out infinite;
+}
+.st-waiting .st-who {
+  color: var(--warn);
+  font-weight: 600;
+}
+/* current: blocked */
+.st-blocked .st-dot {
+  border-color: var(--bad);
+  background: var(--bad);
+  color: #fff;
+}
+.st-gate.st-blocked .st-dot {
+  font-size: 0;
+}
+.st-blocked .st-who {
+  color: var(--bad);
+  font-weight: 600;
+}
+.st-todo .st-label {
+  color: var(--muted);
+  font-weight: 500;
+}
+.is-cancelled {
+  opacity: 0.55;
+}
+.st-cancel {
+  margin: 0;
+  color: var(--bad);
+  font-weight: 600;
+  text-align: center;
+}
+@keyframes st-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 9px transparent;
+  }
+}
+@keyframes st-pulse-warn {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--warn) 45%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 9px transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .st-dot,
+  .st-fill {
+    animation: none !important;
+    transition: none !important;
+  }
+}

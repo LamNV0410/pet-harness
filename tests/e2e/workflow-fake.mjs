@@ -88,7 +88,7 @@ try {
   const approveGate = async (gate) => {
     const a = await until(`${gate} approval`, async () => {
       const w = await stage();
-      if (w.status === "failed" || w.stage === "cancelled")
+      if (w.status === "failed" || w.status === "blocked" || w.stage === "cancelled")
         throw new Error(`work item failed: ${JSON.stringify(w)}`);
       const { approvals } = await api("GET", "/api/approvals?state=pending");
       const hit = approvals.find((x) => x.subjectId?.startsWith(`wi:${wid}`));
@@ -131,6 +131,20 @@ try {
     agentRuns.length >= 3 &&
       agentRuns.every((r) => r.state === "succeeded" || r.state === "done" || r.costUsd !== null),
     `${agentRuns.length} runs`,
+  );
+
+  const started = {};
+  for (const r of agentRuns) {
+    const det = await api("GET", `/api/agent-runs/${r.id}`);
+    const s = det.activity.find((a) => a.text.startsWith("session started"));
+    started[r.role] = s?.text ?? "";
+  }
+  check(
+    "per-role model and effort",
+    started.ba?.includes("fake-opus, effort low") &&
+      started.architect?.includes("fake-opus, effort medium") &&
+      started.be?.includes("fake-sonnet, effort medium"),
+    JSON.stringify(started),
   );
 
   // Secret read through a real run id is denied and audited.
