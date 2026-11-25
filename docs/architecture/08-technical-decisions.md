@@ -19,12 +19,13 @@ This file records the Harness technical decisions (TD). `open-decisions.md` trac
 | TD-03 | Monorepo tooling and root layout | D11 | ACCEPTED (PO, gate 2, 2026-11-25) |
 | TD-04 | Backend↔frontend transport | D12 | ACCEPTED (PO, gate 2, 2026-11-25) |
 | TD-05 | Permission model | D6 | ACCEPTED (PO, gate 2, 2026-11-25) |
-| TD-06 | Model provider port and agent loop | D5 (mechanism only) | ACCEPTED (PO, gate 2, 2026-11-25) |
+| TD-06 | Model provider port and agent loop | D5 (mechanism only) | ACCEPTED (PO, gate 2, 2026-11-25). Its first adapter is SUPERSEDED by TD-12 |
 | TD-07 | Worktrees and product runtime isolation | D3 (Harness side) | ACCEPTED (PO, gate 2, 2026-11-25) |
 | TD-08 | Workflow state, events and recovery | D13 | ACCEPTED (PO, gate 2, 2026-11-25) |
 | TD-09 | Cost controls | D15 (mechanism only) | ACCEPTED (PO, gate 2, 2026-11-25) |
 | TD-10 | One role definition for Claude Code and runtime | — | ACCEPTED (PO, gate 2, 2026-11-25) |
 | TD-11 | Virtual Office rendering | D14 | ACCEPTED (PO, gate 2, 2026-11-25) |
+| TD-12 | Claude Code CLI as the first agent executor (subscription, no API key) | D5 | ACCEPTED (PO, 2026-11-25). Replaces the first adapter of TD-06 |
 
 ---
 
@@ -56,7 +57,7 @@ This file records the Harness technical decisions (TD). `open-decisions.md` trac
 
 | Layer | Choice |
 |---|---|
-| Runtime | Node.js 24 LTS. Its LTS status is INFERRED from the published schedule; confirm at install. |
+| Runtime | Node.js 24 LTS. VERIFIED 2026-11-25: 24.22.3 (Krypton LTS), installed through fnm next to the system Node 20 and pinned in `.node-version` |
 | Language | TypeScript, strict |
 | Backend | Fastify, Zod |
 | Database | SQLite via Drizzle ORM + drizzle-kit migrations |
@@ -130,6 +131,8 @@ This file records the Harness technical decisions (TD). `open-decisions.md` trac
 **Trade-off:** every capability has to be wrapped as a Harness tool, and the rules need tuning to avoid approval fatigue.
 
 ## TD-06 Model provider port and agent loop (D5 mechanism)
+> The first adapter described here (Anthropic Messages API) is **SUPERSEDED by TD-12** (2026-11-25). The executor port and its capability flags remain in force. The Messages API stays an optional future executor.
+
 **Decision:** the Harness owns the agent loop (02 §3), behind a provider port that has capability flags.
 
 **First adapter: Anthropic**, using the official TypeScript SDK and the Messages API with client-defined tools.
@@ -145,6 +148,87 @@ This file records the Harness technical decisions (TD). `open-decisions.md` trac
 - **Hosted managed agents.** Rejected: the work is local-first and the tools have to act on local repos.
 
 **Still OPEN (D5):** which providers to support, and whether product code may be sent to a cloud provider at all.
+
+## TD-12 Claude Code CLI as the first agent executor (D5)
+**Status:** ACCEPTED (PO, 2026-11-25).
+- It replaces the *first adapter* in TD-06.
+- TD-06's executor port stays in force, and so does central permission enforcement (TD-05).
+
+**Context**
+- The PO uses Claude through a **Claude Code subscription**, not the API (PO, 2026-11-25). TD-06 assumed the Messages API, which needs a separate API key and per-token billing.
+- VERIFIED 2026-11-25: there is no `claude` CLI on PATH on this machine. Claude Code is used through the desktop app.
+
+**Facts** from the official Claude Code docs (headless, CLI reference, hooks, legal-and-compliance), checked 2026-11-25:
+
+*Authentication and policy*
+- `claude -p` uses the user's claude.ai login by default. `--bare` turns that off and needs an API key.
+- The policy forbids third parties from offering Claude.ai login in their own apps, or from routing requests through subscription plans *on behalf of their users*.
+- The policy allows an end user to sign in to the **unmodified** Claude Code binary with their own subscription.
+- The published limits assume ordinary individual use.
+- **Our reading:** a personal, local Harness that drives the unmodified binary with the PO's own login fits this policy. Distributing the Harness, or sharing the login, does not. This is our interpretation, not legal advice.
+
+*Flags*
+- Output: `--output-format stream-json` (requires `--verbose`).
+- Limits: `--max-turns`, `--max-budget-usd`.
+- Model and prompt: `--model`, `--append-system-prompt-file`.
+- Tools and permissions: `--allowedTools`, `--disallowedTools`, `--tools`, `--permission-mode`, `--permission-prompt-tool`.
+- MCP: `--mcp-config` together with `--strict-mcp-config`.
+- Settings and directories: `--settings`, `--setting-sources`, `--add-dir`.
+- Sessions: `--session-id`, `--resume`.
+
+*The `result` message*
+- It carries `session_id`, `usage`, `modelUsage`, `num_turns`, `permission_denials` and `total_cost_usd`.
+- `total_cost_usd` is a client-side estimate, not billing.
+
+*Hooks*
+- An `http` PreToolUse hook POSTs every tool call to a URL. The response can be allow, deny, ask or defer.
+- Deny rules always win.
+- If the server can't be reached, the hook fails open, unless `onFailure: "block"` is set. That setting needs v2.1.295 or later.
+
+**Options**
+
+| | A. Claude Code CLI (`claude -p`) per run | B. Messages API (TD-06 as written) | C. Agent SDK |
+|---|---|---|---|
+| Credentials | The PO's own subscription, no API key | API key, billed per token | The docs point third-party products to API keys |
+| Agent loop | Claude Code (built-in tools, context management, sessions) | Harness | SDK |
+| Permission enforcement | HTTP PreToolUse hook to the Harness policy engine, plus allow/deny lists | Harness only | SDK hooks |
+| Cost model | Subscription usage limits (5-hour and weekly windows) | Per token | Per token |
+| Control and portability | Lower: tied to Claude Code's behaviour and versions | Full | Medium |
+
+**Decision: Option A**, behind TD-06's executor port, so that B or a local model can be added later as further executors. Each agent run spawns one `claude` process, configured as follows:
+
+| Setting | How |
+|---|---|
+| Working directory | The task worktree |
+| Session | A new session for every run (`--session-id <uuid>`) |
+| Model | Chosen per role (`--model`) |
+| Limits | `--max-turns`, plus `--max-budget-usd` as a sanity cap on the cost estimate |
+| Role prompt | The role skill, passed with `--append-system-prompt-file` (TD-10) |
+| Output parsing | `--output-format stream-json --verbose`, parsed into Harness events (05 §3) |
+| MCP tools | `--strict-mcp-config --mcp-config <harness MCP>`, which exposes only `cmd_run` (adapter command ids), `approval_request` and `artifact_write` |
+| Built-in tools | Read, Grep, Glob, Edit and Write are allowed. Bash, WebFetch and WebSearch are disallowed. |
+| Permission hook | A Harness-generated `--settings` file installs an **http PreToolUse hook** to the Harness policy engine (TD-05), with `onFailure: "block"` so it fails closed |
+| Permission mode | Never `bypassPermissions` |
+
+**When the policy says "ask"**
+1. The hook returns `deny` with the message "approval requested: <id>".
+2. The run ends.
+3. After the PO decides, the Orchestrator resumes the run with `--resume <session_id>` (03 §6).
+
+This is so no hook stays open while waiting for a person; the default hook timeout is 600 s.
+
+**Usage limits**
+- Concurrency limits (D15) throttle how many runs go at once.
+- A `rate_limit` or `api_retry` signal pauses the queue and notifies the PO.
+- UNKNOWN until tested: whether `claude -p` emits `rate_limit_event`.
+
+**Consequences and risks**
+- **Install.** The official Claude Code CLI must be installed and on PATH (gate 4). The minimum version is the one that supports `onFailure: "block"`; it is pinned in the adapter config.
+- **Product CLAUDE.md.** The product's own `CLAUDE.md` in the worktree will be loaded. There is no documented way to skip it under subscription auth, because `--safe-mode` also disables hooks and MCP. The role prompt therefore states that the discovery docs override stale product instructions. RISK: the stale product docs still influence behaviour.
+- **User settings.** The PO's own Claude Code user settings may load as well. Test in M3 whether `--setting-sources` can exclude them.
+- **Cost.** Spending moves from dollars per token to subscription quota. Agents running in parallel use up the PO's own interactive quota.
+- **Data.** Code goes to Anthropic, exactly as it already does when the PO uses Claude Code on these repos. By accepting this TD on 2026-11-25, the PO confirmed that this is acceptable (D5).
+- **Control.** Some loop behaviour, such as compaction and retries, belongs to Claude Code. TD-08 resume relies on Claude Code's local session store.
 
 ## TD-07 Worktrees and product runtime isolation (D3 Harness side)
 **Proposal**

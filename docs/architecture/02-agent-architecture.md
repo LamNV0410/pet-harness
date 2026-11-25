@@ -56,7 +56,7 @@ sequenceDiagram
    - handles `max_tokens` and refusal stop reasons before running any tool;
    - stops on budget, cancellation or repeated errors.
 4. **Checkpointing.** Each turn and each tool result is appended as an event *before* the next step, so the run can be resumed (03 §6).
-5. **Provider port** (TD-06). Neutral message and tool types with capability flags. The first adapter is Anthropic. A **fake provider** replays scripted turns for tests.
+5. **Provider / executor port** (TD-06). **First executor (TD-12, ACCEPTED):** the Claude Code CLI (`claude -p`), using the PO's subscription. Claude Code owns the turn loop, the built-in tools and context compaction. The Harness owns the spawn options, the role prompt, the parsing of stream-json into events, budgets and turn limits, and policy enforcement through a PreToolUse hook (TD-12 has the details). The port uses neutral event types with capability flags. A **fake executor** replays scripted stream-json runs for tests.
 
 ## 4. Context isolation
 
@@ -96,4 +96,4 @@ The PO can replay what an agent saw and did without re-running any model.
 | A custom loop costs more to build than an agent SDK | Keep M3 minimal. Revisit the agent SDK option after M3 (TD-06). |
 | Strict isolation means an agent lacks context it needs | It asks through `approval.request` / a question to the PO, or the Architect adds the context to `design.md`. Measure in M5. |
 | Tiered models cause quality regressions | Tier per role is configurable. The PO can raise it per work item. |
-| Provider credentials | UNKNOWN: none configured today. Provider choice and data policy: OPEN, D5 |
+| Subscription quota is shared with the PO's own Claude Code use | Concurrency limits and queue pause on rate-limit signals (TD-12). Values: OPEN, D15 |
