@@ -34,6 +34,7 @@ type View =
 interface Route {
   view: View;
   id?: string;
+  tab?: string | undefined;
 }
 
 const SIMPLE: View[] = [
@@ -47,9 +48,9 @@ const SIMPLE: View[] = [
   "timeline",
 ];
 function parse(hash: string): Route {
-  const [head, id] = hash.replace(/^#/, "").split("/");
+  const [head, id, tab] = hash.replace(/^#/, "").split("/");
   if (head && id && ["project", "run", "wi", "agent"].includes(head))
-    return { view: head as View, id };
+    return { view: head as View, id, tab };
   return { view: SIMPLE.includes(head as View) ? (head as View) : "dashboard" };
 }
 
@@ -175,7 +176,7 @@ export function App() {
         {route.view === "timeline" && <TimelineView events={events} />}
         {route.view === "project" && route.id && <ProjectDetail projectId={route.id} />}
         {route.view === "run" && route.id && <RunDetail runId={route.id} />}
-        {route.view === "wi" && route.id && <WorkItemDetail id={route.id} />}
+        {route.view === "wi" && route.id && <WorkItemDetail id={route.id} tab={route.tab} />}
         {route.view === "agent" && route.id && <AgentRunDetail id={route.id} />}
       </main>
     </div>
