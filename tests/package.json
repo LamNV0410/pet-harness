@@ -3,8 +3,5 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "scripts": {
-    "test": "vitest run --passWithNoTests",
-    "e2e": "playwright test"
-  }
+  "scripts": {}
 }

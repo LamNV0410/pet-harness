@@ -9,9 +9,13 @@
   "scripts": {
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
-    "lint": "biome check .",
-    "test": "pnpm -r test",
+    "lint": "biome check . && node scripts/check-boundaries.mjs",
+    "test": "echo \"Tests deferred to WI-001 T9 (PO decision 2026-11-25)\"",
     "e2e": "pnpm --filter @harness/tests e2e",
     "dev": "pnpm --parallel --filter @harness/backend --filter @harness/frontend dev"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.9",
+    "typescript": "^7.0.2"
   }
 }

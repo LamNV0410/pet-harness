@@ -4,13 +4,17 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@harness/shared": "workspace:*"
+    "@harness/shared": "workspace:*",
+    "fastify": "^5.12.8",
+    "yaml": "^2.9.1"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
-    "start": "node dist/main.js",
-    "test": "vitest run --passWithNoTests"
+    "start": "node dist/main.js"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2"
   }
 }

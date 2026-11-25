@@ -16,8 +16,8 @@ generated:
   - "**/dist/**"
 commands:
   build: { argv: [npm, run, build] }
-  test:  { argv: [npx, ng, test, --watch=false, --browsers=ChromeHeadless] }
-  lint:  { argv: [npm, run, lint] }
+  test: { argv: [npx, ng, test, --watch=false, --browsers=ChromeHeadless] }
+  lint: { argv: [npm, run, lint] }
   install: { argv: [npm, install, --legacy-peer-deps], approval: ask }
   run: { argv: [npm, run, dev], approval: ask, port: 4200 }
 health:

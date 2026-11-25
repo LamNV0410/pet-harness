@@ -14,12 +14,12 @@ generated:
   - "**/*ModelSnapshot.cs"
 commands:
   build: { argv: [dotnet, build, UrKnightAPI.sln] }
-  test:  { argv: [dotnet, test, UrKnightAPI.sln] }
+  test: { argv: [dotnet, test, UrKnightAPI.sln] }
   install: { argv: [dotnet, restore, UrKnightAPI.sln], approval: ask }
   run:
     argv: [dotnet, run, --project, UrKnightAPI, --launch-profile, http]
     env: { ASPNETCORE_ENVIRONMENT: Development }
-    approval: ask          # every start needs PO approval (TD-13)
-    maxRuntimeMinutes: 15  # value pending D15
+    approval: ask # every start needs PO approval (TD-13)
+    maxRuntimeMinutes: 15 # value pending D15
 health:
   path: /swagger/v1/swagger.json

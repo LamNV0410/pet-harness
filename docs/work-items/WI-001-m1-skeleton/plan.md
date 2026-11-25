@@ -1,5 +1,5 @@
 # WI-001 Plan
-Status: Execution — gate 3 approved (PO, 2026-11-25). T1 done, T2 in progress
+Status: Execution — T1 and T2 done (2026-11-25). Next: T3
 
 - **Gate 2:** approved on 2026-11-25.
 - **PO direction, 2026-11-25:** build the structure now; tests are deferred.
@@ -41,3 +41,29 @@ Every AC from 1.1 to 7.3 is mapped to T2–T8 for implementation and to T9 for v
 - **Gate 3 + T2 install (gate 4): approved by the PO in chat on 2026-11-25** ("OK làm đi").
   - Packages: the design §8 list, **without** `vitest` and `@playwright/test`, which are deferred to T9 along with the tests.
   - Type packages that the TypeScript build needs (`@types/node`, `@types/react`, `@types/react-dom`) are added and reported in the T2 result.
+- **T2 done (2026-11-25)** on branch `fw/WI-001-T2-install`, with Node 24.22.3 and pnpm 12.23.0.
+  - **Packages installed**, with versions locked in `pnpm-lock.yaml`:
+
+    | Package | Version | Where |
+    |---|---|---|
+    | typescript | 7.0.2 | root |
+    | @biomejs/biome | 2.6.9 | root |
+    | zod | 4.6.7 | shared |
+    | fastify | 5.12.8 | backend |
+    | yaml | 2.9.1 | backend |
+    | @types/node | 24.19.2 | backend |
+    | react, react-dom | 19.3.1 | frontend |
+    | @tanstack/react-query | 5.108.4 | frontend |
+    | vite | 8.3.8 | frontend |
+    | @vitejs/plugin-react | 6.3.0 | frontend |
+    | @types/react, @types/react-dom | 19.3.0 | frontend |
+
+  - **No Zod-to-OpenAPI library was needed.** Zod 4 has built-in JSON Schema output, so that item of design §8 was dropped (one dependency fewer).
+  - **Added:**
+    - `scripts/check-boundaries.mjs`. A quick probe confirmed it catches both a relative-path import and a package-name import (exit 1).
+    - `apps/frontend/vite.config.ts`.
+    - Biome config. It covers code and config only and leaves Markdown, `docs/` and `.claude/` alone.
+  - **Evidence:** `pnpm install --frozen-lockfile`, `pnpm build`, `pnpm typecheck` and `pnpm lint` all exit 0. `pnpm test` only prints that tests are deferred to T9.
+  - **Notes:**
+    - **TypeScript 7.0.2** is the latest release (the new native compiler). It works for build and typecheck so far. If a tool turns out to be incompatible, pinning TypeScript 5.x needs PO approval.
+    - **pnpm package store.** pnpm keeps its package store at `D:\.pnpm-store`, which is pnpm's default location on that drive.
