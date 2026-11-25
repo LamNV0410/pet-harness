@@ -24,12 +24,22 @@ export class ToolService {
     private readonly logger: Logger,
   ) {}
 
-  async invoke(tool: string, role: string, projectId: string, input: Record<string, unknown>): Promise<InvokeOutcome> {
+  async invoke(
+    tool: string,
+    role: string,
+    projectId: string,
+    input: Record<string, unknown>,
+  ): Promise<InvokeOutcome> {
     const toolCallId = randomUUID();
     const correlationId = `tool:${toolCallId}`;
     const safeInput = redact(input);
     const requestedId = this.store.transaction((tx) =>
-      tx.emit("tool.requested", role, { toolCallId, tool, role, projectId, input: safeInput }, { correlationId }),
+      tx.emit(
+        "tool.requested",
+        role,
+        { toolCallId, tool, role, projectId, input: safeInput },
+        { correlationId },
+      ),
     );
 
     const decide = (decision: "allow" | "deny", ruleId: string, reason: string) =>
@@ -38,9 +48,24 @@ export class ToolService {
           .prepare(
             "INSERT INTO tool_calls (id, ts, tool, role, project_id, args_redacted, decision, rule_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
           )
-          .run(toolCallId, new Date().toISOString(), tool, role, projectId, JSON.stringify(safeInput), decision, ruleId, decision === "allow" ? "pending" : "denied");
+          .run(
+            toolCallId,
+            new Date().toISOString(),
+            tool,
+            role,
+            projectId,
+            JSON.stringify(safeInput),
+            decision,
+            ruleId,
+            decision === "allow" ? "pending" : "denied",
+          );
         tx.checkpoint("afterStateWrite");
-        return tx.emit("tool.decided", "permissions", { toolCallId, tool, decision, ruleId, reason }, { correlationId, causationId: requestedId });
+        return tx.emit(
+          "tool.decided",
+          "permissions",
+          { toolCallId, tool, decision, ruleId, reason },
+          { correlationId, causationId: requestedId },
+        );
       });
 
     // Schema validation happens first, but unknown tools/roles are engine denials (OQ-13).
@@ -50,7 +75,9 @@ export class ToolService {
       def = TOOLS[tool] as unknown as ToolDef;
       const parsed = def.input.safeParse(input);
       if (!parsed.success) {
-        const issues = parsed.error.issues.map((i) => `${i.path.join(".") || "(input)"}: ${i.message}`);
+        const issues = parsed.error.issues.map(
+          (i) => `${i.path.join(".") || "(input)"}: ${i.message}`,
+        );
         decide("deny", "fixed:invalid-input", issues.join("; "));
         this.audit(tool, role, "deny", "fixed:invalid-input");
         return { kind: "invalid", toolCallId, issues };
@@ -62,7 +89,11 @@ export class ToolService {
     const scope = this.projects.scope(projectId);
     const verdict =
       def && targets === null
-        ? ({ decision: "deny", ruleId: "fixed:bare-object", reason: "use <ref>:<path>; bare object ids cannot be checked" } as const)
+        ? ({
+            decision: "deny",
+            ruleId: "fixed:bare-object",
+            reason: "use <ref>:<path>; bare object ids cannot be checked",
+          } as const)
         : this.engine.evaluate(tool, role, scope, targets ?? []);
     const decidedId = decide(verdict.decision, verdict.ruleId, verdict.reason);
     this.audit(tool, role, verdict.decision, verdict.ruleId);
@@ -71,7 +102,12 @@ export class ToolService {
     }
 
     const startedId = this.store.transaction((tx) =>
-      tx.emit("tool.started", role, { toolCallId, tool }, { correlationId, causationId: decidedId }),
+      tx.emit(
+        "tool.started",
+        role,
+        { toolCallId, tool },
+        { correlationId, causationId: decidedId },
+      ),
     );
     const t0 = performance.now();
     let outcome: InvokeOutcome;
@@ -80,7 +116,11 @@ export class ToolService {
     let filtered = false;
     let error: string | null = null;
     try {
-      const out = await def.run(parsedInput, { root: scope.root, secrets: scope.secrets, targets: verdict.paths });
+      const out = await def.run(parsedInput, {
+        root: scope.root,
+        secrets: scope.secrets,
+        targets: verdict.paths,
+      });
       const result = redact(out.result);
       const json = JSON.stringify(result);
       outputBytes = Buffer.byteLength(json);
@@ -94,7 +134,9 @@ export class ToolService {
     const durationMs = Math.round(performance.now() - t0);
     this.store.transaction((tx) => {
       tx.db
-        .prepare("UPDATE tool_calls SET status = ?, duration_ms = ?, output_preview = ?, error = ? WHERE id = ?")
+        .prepare(
+          "UPDATE tool_calls SET status = ?, duration_ms = ?, output_preview = ?, error = ? WHERE id = ?",
+        )
         .run(error ? "failed" : "finished", durationMs, preview, error, toolCallId);
       tx.emit(
         "tool.finished",
@@ -103,7 +145,15 @@ export class ToolService {
         { correlationId, causationId: startedId },
       );
     });
-    this.logger.info("tool.finished", { tool, role, projectId, ok: error === null, durationMs, outputBytes, filtered });
+    this.logger.info("tool.finished", {
+      tool,
+      role,
+      projectId,
+      ok: error === null,
+      durationMs,
+      outputBytes,
+      filtered,
+    });
     return outcome;
   }
 

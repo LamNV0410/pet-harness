@@ -21,12 +21,18 @@ export function checkPath(projectRoot: string, input: string): PathCheck {
   const raw = input.trim() === "" ? "." : input;
   if (raw.includes("\0")) return deny("fixed:path-invalid", "path contains a NUL byte");
   if (DEVICE_PREFIX.test(raw)) return deny("fixed:path-invalid", "device paths are not allowed");
-  if (isAbsolute(raw) || win32.isAbsolute(raw) || raw.startsWith("\\\\") || /^[a-zA-Z]:/.test(raw)) {
+  if (
+    isAbsolute(raw) ||
+    win32.isAbsolute(raw) ||
+    raw.startsWith("\\\\") ||
+    /^[a-zA-Z]:/.test(raw)
+  ) {
     return deny("fixed:path-escape", "absolute paths are not allowed; use a project-relative path");
   }
   const segments = raw.split(/[\\/]+/);
   for (const s of segments) {
-    if (s.includes(":")) return deny("fixed:path-invalid", "alternate data streams are not allowed");
+    if (s.includes(":"))
+      return deny("fixed:path-invalid", "alternate data streams are not allowed");
     if (s !== "." && s !== ".." && /[. ]$/.test(s)) {
       return deny("fixed:path-invalid", "path segments may not end with a dot or a space");
     }

@@ -3,7 +3,7 @@
 // (first match) -> default deny. Rule ids: fixed:<check> | policy:<id> (OQ-13).
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { PolicyFile, ROLES, TOOL_NAMES, type PolicyFile as PolicyFileT } from "@harness/shared";
+import { PolicyFile, type PolicyFile as PolicyFileT, ROLES, TOOL_NAMES } from "@harness/shared";
 import { parse as parseYaml } from "yaml";
 import { GlobSet } from "./glob.js";
 import { checkPath } from "./paths.js";
@@ -52,7 +52,9 @@ export class PermissionEngine {
 
   loadPolicy(): void {
     const rules: PolicyFileT["rules"] = [];
-    for (const f of readdirSync(this.policyDir).filter((n) => /\.ya?ml$/i.test(n)).sort()) {
+    for (const f of readdirSync(this.policyDir)
+      .filter((n) => /\.ya?ml$/i.test(n))
+      .sort()) {
       const parsed = PolicyFile.parse(parseYaml(readFileSync(join(this.policyDir, f), "utf8")));
       rules.push(...parsed.rules);
     }
@@ -79,7 +81,10 @@ export class PermissionEngine {
       const c = checkPath(project.root, t);
       if (!c.ok) return deny(c.ruleId, c.reason);
       if (project.secrets.matches(c.rel) || project.secrets.matches(c.lexicalRel)) {
-        return deny("fixed:secret-path", `"${t}" matches a secret path; its content can never be read`);
+        return deny(
+          "fixed:secret-path",
+          `"${t}" matches a secret path; its content can never be read`,
+        );
       }
       // M1 has no write tools, so writes (including to policy/**) are impossible by construction.
       resolved.push({ input: t, abs: c.abs, rel: c.rel, exists: c.exists });
@@ -90,7 +95,12 @@ export class PermissionEngine {
       const toolMatch = rule.tools.includes(tool) || rule.tools.includes("*");
       if (roleMatch && toolMatch) {
         return rule.effect === "allow"
-          ? { decision: "allow", ruleId: `policy:${rule.id}`, reason: "allowed by policy", paths: resolved }
+          ? {
+              decision: "allow",
+              ruleId: `policy:${rule.id}`,
+              reason: "allowed by policy",
+              paths: resolved,
+            }
           : deny(`policy:${rule.id}`, "denied by policy");
       }
     }

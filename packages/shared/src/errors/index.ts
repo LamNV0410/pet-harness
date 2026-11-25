@@ -21,5 +21,7 @@ export const ErrorBody = z.object({
 export type ErrorBody = z.infer<typeof ErrorBody>;
 
 export function errorBody(code: ErrorCode, message: string, details?: unknown): ErrorBody {
-  return details === undefined ? { error: { code, message } } : { error: { code, message, details } };
+  return details === undefined
+    ? { error: { code, message } }
+    : { error: { code, message, details } };
 }

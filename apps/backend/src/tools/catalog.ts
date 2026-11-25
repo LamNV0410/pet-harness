@@ -31,7 +31,9 @@ const relPath = z.string().max(1024).default(".");
 const ref = z.string().regex(SAFE_REF, "invalid git ref");
 
 function excludeSpecs(secrets: GlobSet): string[] {
-  return secrets.patterns.map((p) => `:(exclude,glob,icase)${p.startsWith("**/") || p.includes("/") ? p : `**/${p}`}`);
+  return secrets.patterns.map(
+    (p) => `:(exclude,glob,icase)${p.startsWith("**/") || p.includes("/") ? p : `**/${p}`}`,
+  );
 }
 
 async function listRepoFiles(root: string): Promise<string[]> {
@@ -55,7 +57,11 @@ export const TOOLS = {
         .slice(0, 1000)
         .map((d) => {
           const rel = t.rel === "." ? d.name : `${t.rel}/${d.name}`;
-          return { name: d.name, type: d.isDirectory() ? "dir" : "file", secret: ctx.secrets.matches(rel) };
+          return {
+            name: d.name,
+            type: d.isDirectory() ? "dir" : "file",
+            secret: ctx.secrets.matches(rel),
+          };
         });
       return { result: { path: t.rel, entries }, filtered: false };
     },
@@ -75,7 +81,9 @@ export const TOOLS = {
       if (!st.isFile()) throw new Error("not a file");
       const ranged = i.startLine !== undefined || i.endLine !== undefined;
       if (st.size > MAX_READ_BYTES && !ranged) {
-        throw new Error(`file is ${st.size} bytes; read it with startLine/endLine (max ${MAX_READ_BYTES} bytes)`);
+        throw new Error(
+          `file is ${st.size} bytes; read it with startLine/endLine (max ${MAX_READ_BYTES} bytes)`,
+        );
       }
       const lines = readFileSync(t.abs, "utf8").split(/\r?\n/);
       const start = (i.startLine ?? 1) - 1;
@@ -84,7 +92,14 @@ export const TOOLS = {
       const truncated = Buffer.byteLength(content) > MAX_READ_BYTES;
       if (truncated) content = content.slice(0, MAX_READ_BYTES);
       return {
-        result: { path: t.rel, startLine: start + 1, endLine: end, totalLines: lines.length, truncated, content },
+        result: {
+          path: t.rel,
+          startLine: start + 1,
+          endLine: end,
+          totalLines: lines.length,
+          truncated,
+          content,
+        },
         filtered: false,
       };
     },
@@ -97,7 +112,16 @@ export const TOOLS = {
     run: async (i, ctx) => {
       const t = ctx.targets[0] as ResolvedTarget;
       const { stdout } = await git(ctx.root, [
-        "grep", "-n", "-I", "--untracked", "-F", "-e", i.pattern, "--", t.rel, ...excludeSpecs(ctx.secrets),
+        "grep",
+        "-n",
+        "-I",
+        "--untracked",
+        "-F",
+        "-e",
+        i.pattern,
+        "--",
+        t.rel,
+        ...excludeSpecs(ctx.secrets),
       ]);
       const matches = stdout
         .split(/\r?\n/)
@@ -105,22 +129,38 @@ export const TOOLS = {
         .slice(0, 500)
         .map((line) => {
           const m = /^(.*?):(\d+):(.*)$/.exec(line);
-          return m ? { path: m[1] ?? "", line: Number(m[2]), text: (m[3] ?? "").slice(0, 400) } : null;
+          return m
+            ? { path: m[1] ?? "", line: Number(m[2]), text: (m[3] ?? "").slice(0, 400) }
+            : null;
         })
         .filter((m) => m !== null && !ctx.secrets.matches(m.path));
-      const excludedSecretPaths = (await listRepoFiles(ctx.root)).filter((f) => ctx.secrets.matches(f)).length;
-      return { result: { pattern: i.pattern, matches, excludedSecretPaths }, filtered: excludedSecretPaths > 0 };
+      const excludedSecretPaths = (await listRepoFiles(ctx.root)).filter((f) =>
+        ctx.secrets.matches(f),
+      ).length;
+      return {
+        result: { pattern: i.pattern, matches, excludedSecretPaths },
+        filtered: excludedSecretPaths > 0,
+      };
     },
   }),
 
   "git.log": def({
     name: "git.log",
-    input: z.object({ ref: ref.default("HEAD"), maxCount: z.number().int().min(1).max(50).default(20), path: relPath }),
+    input: z.object({
+      ref: ref.default("HEAD"),
+      maxCount: z.number().int().min(1).max(50).default(20),
+      path: relPath,
+    }),
     targets: (i) => [i.path],
     run: async (i, ctx) => {
       const t = ctx.targets[0] as ResolvedTarget;
       const { stdout } = await git(ctx.root, [
-        "log", `-n${i.maxCount}`, "--format=%H%x1f%an%x1f%aI%x1f%s", i.ref, "--", t.rel,
+        "log",
+        `-n${i.maxCount}`,
+        "--format=%H%x1f%an%x1f%aI%x1f%s",
+        i.ref,
+        "--",
+        t.rel,
       ]);
       const commits = stdout
         .split(/\r?\n/)
@@ -142,24 +182,43 @@ export const TOOLS = {
       const t = ctx.targets[0] as ResolvedTarget;
       const { stdout } = await git(ctx.root, ["show", `${i.ref}:${t.rel}`]);
       const content = stdout.length > MAX_READ_BYTES ? stdout.slice(0, MAX_READ_BYTES) : stdout;
-      return { result: { ref: i.ref, path: t.rel, truncated: content.length < stdout.length, content }, filtered: false };
+      return {
+        result: { ref: i.ref, path: t.rel, truncated: content.length < stdout.length, content },
+        filtered: false,
+      };
     },
   }),
 
   "git.diff": def({
     name: "git.diff",
-    input: z.object({ from: ref.default("HEAD"), to: ref.optional(), paths: z.array(z.string().max(1024)).max(50).default([]) }),
+    input: z.object({
+      from: ref.default("HEAD"),
+      to: ref.optional(),
+      paths: z.array(z.string().max(1024)).max(50).default([]),
+    }),
     targets: (i) => (i.paths.length ? i.paths : ["."]),
     run: async (i, ctx) => {
       const range = i.to ? [i.from, i.to] : [i.from];
       const scope = ctx.targets.map((t) => t.rel);
-      const { stdout: names } = await git(ctx.root, ["diff", "--name-only", ...range, "--", ...scope]);
+      const { stdout: names } = await git(ctx.root, [
+        "diff",
+        "--name-only",
+        ...range,
+        "--",
+        ...scope,
+      ]);
       const changed = names.split(/\r?\n/).filter(Boolean);
       const secret = changed.filter((f) => ctx.secrets.matches(f));
       const safe = changed.filter((f) => !ctx.secrets.matches(f));
       let withheld: { path: string; added: string; removed: string }[] = [];
       if (secret.length) {
-        const { stdout: num } = await git(ctx.root, ["diff", "--numstat", ...range, "--", ...secret]);
+        const { stdout: num } = await git(ctx.root, [
+          "diff",
+          "--numstat",
+          ...range,
+          "--",
+          ...secret,
+        ]);
         withheld = num
           .split(/\r?\n/)
           .filter(Boolean)
@@ -170,7 +229,13 @@ export const TOOLS = {
       }
       let patch = "";
       if (safe.length) {
-        const { stdout } = await git(ctx.root, ["diff", ...range, "--", ...safe, ...excludeSpecs(ctx.secrets)]);
+        const { stdout } = await git(ctx.root, [
+          "diff",
+          ...range,
+          "--",
+          ...safe,
+          ...excludeSpecs(ctx.secrets),
+        ]);
         patch = stdout.length > MAX_READ_BYTES ? stdout.slice(0, MAX_READ_BYTES) : stdout;
       }
       return { result: { range, files: safe, withheld, patch }, filtered: withheld.length > 0 };

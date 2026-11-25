@@ -32,7 +32,9 @@ export class ProjectRegistry {
   load(): ReloadResult {
     const rejected: ReloadResult["rejected"] = [];
     const files = existsSync(this.adaptersDir)
-      ? readdirSync(this.adaptersDir).filter((f) => /\.ya?ml$/i.test(f)).sort()
+      ? readdirSync(this.adaptersDir)
+          .filter((f) => /\.ya?ml$/i.test(f))
+          .sort()
       : [];
     const seen = new Set<string>();
     for (const file of files) {
@@ -94,14 +96,30 @@ export class ProjectRegistry {
              status=excluded.status, reason=excluded.reason, secret_paths=excluded.secret_paths,
              updated_at=excluded.updated_at`,
         )
-        .run(p.id, p.name, p.path, p.baseRef, p.status, p.reason, JSON.stringify(p.secretPaths), new Date().toISOString());
+        .run(
+          p.id,
+          p.name,
+          p.path,
+          p.baseRef,
+          p.status,
+          p.reason,
+          JSON.stringify(p.secretPaths),
+          new Date().toISOString(),
+        );
       tx.checkpoint("afterStateWrite");
       const correlationId = `project:${p.id}`;
       if (!prev || prev.name !== p.name || prev.path !== p.path || prev.base_ref !== p.baseRef) {
         tx.emit(
           "project.registered",
           "system",
-          { projectId: p.id, name: p.name, path: p.path, baseRef: p.baseRef, status: p.status, reason: p.reason },
+          {
+            projectId: p.id,
+            name: p.name,
+            path: p.path,
+            baseRef: p.baseRef,
+            status: p.status,
+            reason: p.reason,
+          },
           { correlationId },
         );
       } else if (prev.status !== p.status || prev.reason !== p.reason) {

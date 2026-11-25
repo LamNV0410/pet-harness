@@ -15,7 +15,12 @@ import { ToolService } from "./tools/service.js";
 async function main(): Promise<void> {
   const config = loadConfig();
   const logger = new Logger(config.home, redact, false);
-  const store = new Store(join(config.home, "harness.db"), config.migrationsDir, config.testMode, redact);
+  const store = new Store(
+    join(config.home, "harness.db"),
+    config.migrationsDir,
+    config.testMode,
+    redact,
+  );
   const token = loadOrCreateToken(config.home);
   const engine = new PermissionEngine(config.policyDir);
   engine.loadPolicy();
@@ -31,13 +36,26 @@ async function main(): Promise<void> {
 
   writeFileSync(
     join(config.home, "runtime.json"),
-    JSON.stringify({ port, pid: process.pid, startedAt: new Date().toISOString(), dev: config.dev }, null, 2),
+    JSON.stringify(
+      { port, pid: process.pid, startedAt: new Date().toISOString(), dev: config.dev },
+      null,
+      2,
+    ),
   );
   store.transaction((tx) => tx.emit("system.started", "system", { version: config.version }));
-  logger.info("started", { port, projects: loaded.projects.length, rejectedAdapters: loaded.rejected.length });
-  console.log(`Furwatch Harness ${config.version} listening on http://127.0.0.1:${port}${config.dev ? " (dev)" : ""}`);
-  console.log(`Projects: ${loaded.projects.map((p) => `${p.id} [${p.status}]`).join(", ") || "none"}`);
-  if (loaded.rejected.length) console.log(`Rejected adapters: ${loaded.rejected.map((r) => r.file).join(", ")}`);
+  logger.info("started", {
+    port,
+    projects: loaded.projects.length,
+    rejectedAdapters: loaded.rejected.length,
+  });
+  console.log(
+    `Furwatch Harness ${config.version} listening on http://127.0.0.1:${port}${config.dev ? " (dev)" : ""}`,
+  );
+  console.log(
+    `Projects: ${loaded.projects.map((p) => `${p.id} [${p.status}]`).join(", ") || "none"}`,
+  );
+  if (loaded.rejected.length)
+    console.log(`Rejected adapters: ${loaded.rejected.map((r) => r.file).join(", ")}`);
 
   const shutdown = async () => {
     await app.close();

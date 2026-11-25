@@ -22,7 +22,7 @@ export function buildOpenApiDocument(version: string): Record<string, unknown> {
       "200": {
         description: "OK",
         content: {
-          [("stream" in c && c.stream) ? "text/event-stream" : "application/json"]: {
+          ["stream" in c && c.stream ? "text/event-stream" : "application/json"]: {
             schema: schema(c.response),
           },
         },
@@ -37,7 +37,10 @@ export function buildOpenApiDocument(version: string): Record<string, unknown> {
     }
     const op: Record<string, unknown> = { operationId: c.id, summary: c.summary, responses };
     if ("body" in c && c.body) {
-      op.requestBody = { required: true, content: { "application/json": { schema: schema(c.body) } } };
+      op.requestBody = {
+        required: true,
+        content: { "application/json": { schema: schema(c.body) } },
+      };
     }
     if ("query" in c && c.query) op["x-query-schema"] = schema(c.query);
     paths[oaPath] = { ...(paths[oaPath] ?? {}), [c.method.toLowerCase()]: op };

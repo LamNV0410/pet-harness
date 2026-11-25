@@ -1,5 +1,5 @@
 # WI-001 Plan
-Status: Execution — T1 and T2 done (2026-11-25). Next: T3
+Status: Execution — T1–T8 done (2026-11-25). T9 (tests) deferred by PO; T10 pending
 
 - **Gate 2:** approved on 2026-11-25.
 - **PO direction, 2026-11-25:** build the structure now; tests are deferred.
@@ -67,3 +67,26 @@ Every AC from 1.1 to 7.3 is mapped to T2–T8 for implementation and to T9 for v
   - **Notes:**
     - **TypeScript 7.0.2** is the latest release (the new native compiler). It works for build and typecheck so far. If a tool turns out to be incompatible, pinning TypeScript 5.x needs PO approval.
     - **pnpm package store.** pnpm keeps its package store at `D:\.pnpm-store`, which is pnpm's default location on that drive.
+- **T3–T8 done (2026-11-25)** on branch `fw/WI-001-T3-T8`. It is one branch with one commit per task group, instead of one branch per task (an Orchestrator simplification, since the work was sequential).
+
+  | Task | Commit | Scope |
+  |---|---|---|
+  | T3 | `74f3131` | Shared contracts |
+  | T4–T7 | `1fc38c1` | Backend |
+  | T8 | (this commit) | Frontend |
+
+  - **Evidence:** `pnpm build`, `pnpm typecheck` and `pnpm lint` all exit 0. One Biome warning remains (CSS selector order).
+  - **Manual smoke test**, backend on a temporary `HARNESS_HOME`, real adapters:
+    - **Access:** no token → 401. Foreign Origin → 403. Health returns 200 `{status: ok, db: ok}`.
+    - **Projects:** both are available.
+    - **Denied as expected:**
+      - `fs.read` and `git.show` of `appsettings*.json` → 403 `fixed:secret-path`;
+      - path traversal → 403 `fixed:path-escape`;
+      - alternate data stream → 403 `fixed:path-invalid`;
+      - unknown tool or role → 403;
+      - bare `git.show` → 403 `fixed:bare-object`.
+    - **Allowed:** `fs.list` returns 200. `search.text` returns 200 with 8 secret paths excluded, and no secret file appears in the results.
+    - **Event stream:** the event arrives in about 230 ms.
+    - **No raw secrets stored:** neither the DB nor the log contains a raw `Password=` value.
+  - **UI:** checked in the browser pane at `http://127.0.0.1:7420`. Projects lists both products. The Timeline shows live allow and deny events.
+  - **Not verified:** the acceptance criteria have no automated tests (T9 is deferred), and AC-7.3 (auto-reconnect after a restart) has not been checked by hand.

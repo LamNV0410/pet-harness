@@ -45,7 +45,9 @@ export class Store {
   ) {
     mkdirSync(dirname(file), { recursive: true });
     this.db = new DatabaseSync(file);
-    this.db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
+    this.db.exec(
+      "PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;",
+    );
     this.migrate(migrationsDir);
   }
 
@@ -95,7 +97,14 @@ export class Store {
         const safePayload = this.redact(payload);
         const correlationId = opts?.correlationId ?? "system";
         const causationId = opts?.causationId ?? null;
-        const res = insert.run(ts, type, actor, correlationId, causationId, JSON.stringify(safePayload));
+        const res = insert.run(
+          ts,
+          type,
+          actor,
+          correlationId,
+          causationId,
+          JSON.stringify(safePayload),
+        );
         const id = Number(res.lastInsertRowid);
         committed.push(
           toEvent({

@@ -12,7 +12,10 @@ export function formatSse(e: HarnessEvent): string {
 }
 
 /** Parses Last-Event-ID / since. Returns null when the value is not a non-negative integer. */
-export function parseResume(lastEventId: string | undefined, since: string | undefined): number | null {
+export function parseResume(
+  lastEventId: string | undefined,
+  since: string | undefined,
+): number | null {
   const raw = lastEventId ?? since;
   if (raw === undefined || raw === "") return 0;
   if (!/^\d+$/.test(raw)) return null;

@@ -35,7 +35,8 @@ export function redactText(text: string): string {
   return out;
 }
 
-const SECRET_KEY = /(password|passwd|secret|token|apikey|api_key|authorization|privatekey|private_key)/i;
+const SECRET_KEY =
+  /(password|passwd|secret|token|apikey|api_key|authorization|privatekey|private_key)/i;
 
 export function redact(value: unknown, depth = 0): unknown {
   if (depth > 20) return "«redacted:too-deep»";
@@ -44,7 +45,10 @@ export function redact(value: unknown, depth = 0): unknown {
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value)) {
-      out[k] = SECRET_KEY.test(k) && typeof v === "string" ? "«redacted:secret-value»" : redact(v, depth + 1);
+      out[k] =
+        SECRET_KEY.test(k) && typeof v === "string"
+          ? "«redacted:secret-value»"
+          : redact(v, depth + 1);
     }
     return out;
   }

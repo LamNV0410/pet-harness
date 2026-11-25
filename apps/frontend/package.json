@@ -7,7 +7,8 @@
     "@harness/shared": "workspace:*",
     "@tanstack/react-query": "^5.108.4",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "zod": "^4.6.7"
   },
   "scripts": {
     "dev": "vite",

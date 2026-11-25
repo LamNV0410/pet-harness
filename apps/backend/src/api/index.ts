@@ -6,9 +6,9 @@ import {
   type ContractDef,
   contracts,
   type ErrorCode,
-  errorBody,
-  EventsQuery,
   EventStreamQuery,
+  EventsQuery,
+  errorBody,
   ToolInvokeRequest,
 } from "@harness/shared";
 import Fastify, { type FastifyInstance, type FastifyReply, type RouteHandlerMethod } from "fastify";
@@ -51,7 +51,10 @@ const MIME: Record<string, string> = {
 };
 
 function fail(reply: FastifyReply, code: ErrorCode, message: string, details?: unknown) {
-  return reply.code(STATUS[code]).type("application/json").send(errorBody(code, message, details));
+  return reply
+    .code(STATUS[code])
+    .type("application/json")
+    .send(errorBody(code, message, details));
 }
 
 export const registeredContracts: ContractDef[] = [];
@@ -75,14 +78,16 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     if (origin && !allowedOrigins(deps.port(), config.dev).has(origin)) {
       return fail(reply, "FORBIDDEN_ORIGIN", "Origin is not allowed");
     }
-    if (req.method === "OPTIONS") return fail(reply, "FORBIDDEN_ORIGIN", "CORS preflight is not supported");
+    if (req.method === "OPTIONS")
+      return fail(reply, "FORBIDDEN_ORIGIN", "CORS preflight is not supported");
     if (!req.url.startsWith("/api/")) return; // static UI is served without a token
     const auth = req.headers.authorization;
     let given = auth?.startsWith("Bearer ") ? auth.slice(7) : undefined;
     if (given === undefined && req.url.startsWith(`${contracts.eventStream.path}`)) {
       given = (req.query as { token?: string }).token;
     }
-    if (!tokenMatches(token, given)) return fail(reply, "UNAUTHORIZED", "Missing or invalid session token");
+    if (!tokenMatches(token, given))
+      return fail(reply, "UNAUTHORIZED", "Missing or invalid session token");
   });
 
   app.setErrorHandler((err, _req, reply) => {
@@ -113,26 +118,54 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   route(contracts.eventStream, async (req, reply) => {
     const q = EventStreamQuery.safeParse(req.query);
     const lastId = req.headers["last-event-id"];
-    const since = parseResume(typeof lastId === "string" ? lastId : undefined, q.success && q.data.since !== undefined ? String(q.data.since) : (req.query as { since?: string }).since);
-    if (since === null || !q.success) return fail(reply, "VALIDATION_FAILED", "Last-Event-ID / since must be a non-negative integer");
+    const since = parseResume(
+      typeof lastId === "string" ? lastId : undefined,
+      q.success && q.data.since !== undefined
+        ? String(q.data.since)
+        : (req.query as { since?: string }).since,
+    );
+    if (since === null || !q.success)
+      return fail(
+        reply,
+        "VALIDATION_FAILED",
+        "Last-Event-ID / since must be a non-negative integer",
+      );
     reply.hijack();
     openStream(store, reply.raw, since);
   });
 
   route(contracts.invokeTool, async (req, reply) => {
     const body = ToolInvokeRequest.safeParse(req.body ?? {});
-    if (!body.success) return fail(reply, "VALIDATION_FAILED", "Invalid request body", body.error.issues);
+    if (!body.success)
+      return fail(reply, "VALIDATION_FAILED", "Invalid request body", body.error.issues);
     const tool = (req.params as { tool: string }).tool;
     const out = await tools.invoke(tool, body.data.role, body.data.projectId, body.data.input);
     switch (out.kind) {
       case "ok":
-        return { toolCallId: out.toolCallId, decision: "allow", ruleId: out.ruleId, filtered: out.filtered, result: out.result };
+        return {
+          toolCallId: out.toolCallId,
+          decision: "allow",
+          ruleId: out.ruleId,
+          filtered: out.filtered,
+          result: out.result,
+        };
       case "denied":
-        return fail(reply, "TOOL_DENIED", out.reason, { toolCallId: out.toolCallId, ruleId: out.ruleId });
+        return fail(reply, "TOOL_DENIED", out.reason, {
+          toolCallId: out.toolCallId,
+          ruleId: out.ruleId,
+        });
       case "invalid":
-        return fail(reply, "VALIDATION_FAILED", "Invalid tool input", { toolCallId: out.toolCallId, issues: out.issues });
+        return fail(reply, "VALIDATION_FAILED", "Invalid tool input", {
+          toolCallId: out.toolCallId,
+          issues: out.issues,
+        });
       case "failed":
-        return reply.code(422).send(errorBody("VALIDATION_FAILED", out.error, { toolCallId: out.toolCallId, ruleId: out.ruleId }));
+        return reply.code(422).send(
+          errorBody("VALIDATION_FAILED", out.error, {
+            toolCallId: out.toolCallId,
+            ruleId: out.ruleId,
+          }),
+        );
     }
   });
 
@@ -145,11 +178,15 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     const candidate = resolve(dist, urlPath || "index.html");
     const inside = !relative(dist, candidate).startsWith("..");
     const file =
-      inside && existsSync(candidate) && statSync(candidate).isFile() ? candidate : resolve(dist, "index.html");
+      inside && existsSync(candidate) && statSync(candidate).isFile()
+        ? candidate
+        : resolve(dist, "index.html");
     if (!existsSync(file)) {
       return reply
         .type("text/html; charset=utf-8")
-        .send("<p>Harness UI is not built yet. Run <code>pnpm build</code> in the harness folder.</p>");
+        .send(
+          "<p>Harness UI is not built yet. Run <code>pnpm build</code> in the harness folder.</p>",
+        );
     }
     const ext = extname(file);
     if (ext === ".html") {
@@ -157,7 +194,10 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         "</head>",
         `  <meta name="harness-session-token" content="${token}" />\n  </head>`,
       );
-      return reply.header("Cache-Control", "no-store").type(MIME[".html"] as string).send(html);
+      return reply
+        .header("Cache-Control", "no-store")
+        .type(MIME[".html"] as string)
+        .send(html);
     }
     return reply.type(MIME[ext] ?? "application/octet-stream").send(readFileSync(file));
   });

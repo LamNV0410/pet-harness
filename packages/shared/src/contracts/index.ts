@@ -2,7 +2,7 @@
 // and the frontend client is typed by them (OQ-15), so the two apps cannot drift apart.
 import { z } from "zod";
 import { Project } from "../domain/index.js";
-import { ErrorCode } from "../errors/index.js";
+import type { ErrorCode } from "../errors/index.js";
 import { HarnessEvent } from "../events/index.js";
 
 export interface ContractDef {
