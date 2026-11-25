@@ -41,7 +41,7 @@ This file records the Harness technical decisions (TD). `open-decisions.md` trac
 - It must stay independent of the product stacks.
 - Installed today (VERIFIED, `01` C8):
   - Node 20.20.1. INFERRED to be past end-of-life.
-  - corepack, .NET SDK 10, Python 3.11, git, ripgrep, Chrome.
+  - corepack, .NET SDK 10, Python 3.11, git, Chrome. ripgrep is **not** installed; corrected 2026-11-25, and text search uses `git grep`.
   - pnpm and Docker are not installed.
 
 **Options**
@@ -67,6 +67,8 @@ This file records the Harness technical decisions (TD). `open-decisions.md` trac
 | Lint/format | Biome |
 
 **Fallback:** if the native SQLite driver fails to install, use Node's built-in SQLite module.
+
+**Amendment (WI-001 DS-1, PO gate 2, 2026-11-25):** M1 uses the built-in `node:sqlite` (verified on Node 24.22.3) with SQL migrations and a thin hand-written data layer. It does **not** use Drizzle or `better-sqlite3`. Text search uses `git grep` (DS-2), because ripgrep is not installed.
 
 **Consequences**
 - Needs gate-4 approval for the installs.

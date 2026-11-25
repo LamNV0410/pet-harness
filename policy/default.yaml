@@ -1,0 +1,10 @@
+# Harness permission policy (TD-05, design.md §5.4). Agents can never write to policy/**.
+# Fixed checks run in code BEFORE these rules and cannot be relaxed here:
+#   schema -> unknown tool/role -> path escape -> secret path (adapter + global list) -> any write (denied in M1)
+# Rule ids are reported as policy:<id>; fixed checks as fixed:<check>.
+version: 1
+rules:
+  - id: read-registered-projects
+    effect: allow
+    roles: [ba, architect, be, fe, tester, release]
+    tools: [fs.list, fs.read, search.text, git.log, git.show, git.diff]

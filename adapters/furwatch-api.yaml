@@ -1,0 +1,25 @@
+# Project adapter for furwatch-api (blueprint 04 §5, TD-13). Only glob patterns, no secret values.
+# M1 uses: id, name, path, baseRef, secretPaths, generated. `commands` is parsed from M2 on.
+id: furwatch-api
+name: furwatch-api
+path: ../furwatch-api
+baseRef: dev_v3
+secretPaths:
+  - "**/appsettings*.json"
+  - "**/ServiceAccounts/**"
+  - "**/Keys/**"
+  - "**/*.pubxml.user"
+generated:
+  - "**/Migrations/*.Designer.cs"
+  - "**/*ModelSnapshot.cs"
+commands:
+  build: { argv: [dotnet, build, UrKnightAPI.sln] }
+  test:  { argv: [dotnet, test, UrKnightAPI.sln] }
+  install: { argv: [dotnet, restore, UrKnightAPI.sln], approval: ask }
+  run:
+    argv: [dotnet, run, --project, UrKnightAPI, --launch-profile, http]
+    env: { ASPNETCORE_ENVIRONMENT: Development }
+    approval: ask          # every start needs PO approval (TD-13)
+    maxRuntimeMinutes: 15  # value pending D15
+health:
+  path: /swagger/v1/swagger.json

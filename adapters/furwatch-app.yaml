@@ -1,0 +1,24 @@
+# Project adapter for furwatch-app (blueprint 04 §5, D1 = origin/dev_v3). Only glob patterns, no secret values.
+id: furwatch-app
+name: furwatch-app
+path: ../furwatch-app
+baseRef: origin/dev_v3
+secretPaths:
+  - "**/google-services.json"
+  - "**/GoogleService-Info*.plist"
+  - "src/environments/**"
+  - "src/index.html"
+  - "src/firebase-messaging-sw.js"
+generated:
+  - "android/**"
+  - "ios/**"
+  - "www/**"
+  - "**/dist/**"
+commands:
+  build: { argv: [npm, run, build] }
+  test:  { argv: [npx, ng, test, --watch=false, --browsers=ChromeHeadless] }
+  lint:  { argv: [npm, run, lint] }
+  install: { argv: [npm, install, --legacy-peer-deps], approval: ask }
+  run: { argv: [npm, run, dev], approval: ask, port: 4200 }
+health:
+  path: /

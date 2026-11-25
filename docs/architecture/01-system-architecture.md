@@ -49,7 +49,7 @@ Decisions are referenced as `TD-NN` (in `08-technical-decisions.md`) and `D#` (i
 | C5 | `furwatch-app` can't be built from the local checkout | VERIFIED: `frontend.md` | Worktrees are created from a git ref; FE work is blocked by D1 |
 | C6 | The human decides; production needs explicit approval | `CLAUDE.md` gates | Approval Center. Gate actions can't be configured away. |
 | C7 | BE/FE monorepo with contract-first API | ACCEPTED (D7a): `contracts.md` | `packages/shared` is the only coupling between the two apps |
-| C8 | Toolchain on this machine | VERIFIED 2026-11-25 | Installed: Node 20.20.1, corepack, git 2.55, ripgrep, Chrome, .NET SDK 10, Python 3.11. Not installed: pnpm, Docker, Java. The stack is chosen in D4 / TD-01. |
+| C8 | Toolchain on this machine | VERIFIED 2026-11-25 | Installed: Node 20.20.1 (system), Node 24.22.3 + pnpm 12.23.0 (via fnm), git 2.55, Chrome, .NET SDK 10, Python 3.11. Not installed: Docker, Java, **ripgrep**. Correction 2026-11-25: the `rg` found earlier was a helper inside the Claude Code shell, not a system install. Text search therefore uses `git grep`. The stack is chosen in D4 / TD-01. |
 
 ## 3. Containers
 The system is one deployable backend plus a static frontend. There are no microservices and no message broker. In-process modules are enough for a single local user.
@@ -66,7 +66,7 @@ flowchart LR
     WF & ORC & AE & TR --> ES[(Event store + state<br/>SQLite in .harness/)]
   end
   AE -->|HTTPS| LLM[Model provider APIs]
-  TR -->|argv, no shell| GIT[git / ripgrep]
+  TR -->|argv, no shell| GIT[git incl. git grep]
   TR -->|adapter commands| TC[dotnet / npm toolchains]
   GIT --> WT[.harness/worktrees/*]
   WT -. created from refs of .-> PR[(../furwatch-api<br/>../furwatch-app)]
@@ -97,7 +97,7 @@ apps/backend/src/
   permissions/       # policy engine, approvals, secret-path deny, redaction
   workspaces/        # git worktree lifecycle, branch naming
   runtime/           # process supervisor, ports, health probes, verification runner
-  projects/          # adapter manifests, project registry, indexing (rg)
+  projects/          # adapter manifests, project registry, indexing (git ls-files / git grep)
   events/            # event append, in-process bus, projections
   store/             # SQLite access + migrations (only module touching the DB)
   config/            # typed config, env profile loading (names only in logs)

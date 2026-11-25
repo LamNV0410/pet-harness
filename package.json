@@ -1,0 +1,17 @@
+{
+  "name": "furwatch-harness",
+  "private": true,
+  "description": "Furwatch Harness - local-first hybrid AI development team (monorepo root)",
+  "packageManager": "pnpm@12.23.0",
+  "engines": {
+    "node": "24.22.3"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "biome check .",
+    "test": "pnpm -r test",
+    "e2e": "pnpm --filter @harness/tests e2e",
+    "dev": "pnpm --parallel --filter @harness/backend --filter @harness/frontend dev"
+  }
+}
