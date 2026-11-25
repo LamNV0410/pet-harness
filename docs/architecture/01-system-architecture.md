@@ -45,7 +45,7 @@ Decisions are referenced as `TD-NN` (in `08-technical-decisions.md`) and `D#` (i
 | C1 | Local-first, one user, Windows 11 | VERIFIED: `docs/discovery/README.md` | One backend process. Embedded database. Binds to 127.0.0.1. |
 | C2 | Cost-conscious | PO brief | Deterministic orchestration with no LLM in control flow. Model tiering and caching (doc 02 §6). |
 | C3 | Product repos contain committed secrets | VERIFIED: `backend.md` §8, `frontend.md` §4 | Secret paths are denied and all output is redacted (doc 04) |
-| C4 | Starting `furwatch-api` has side effects | VERIFIED: `backend.md` §2, §4 | Product servers are disabled until D3 is resolved (TD-07) |
+| C4 | Starting `furwatch-api` has side effects | VERIFIED: `backend.md` §2, §4 | The API runs on the dev/test database only after the PO approves each start, and only for a short time (TD-13) |
 | C5 | `furwatch-app` can't be built from the local checkout | VERIFIED: `frontend.md` | Worktrees are created from a git ref; FE work is blocked by D1 |
 | C6 | The human decides; production needs explicit approval | `CLAUDE.md` gates | Approval Center. Gate actions can't be configured away. |
 | C7 | BE/FE monorepo with contract-first API | ACCEPTED (D7a): `contracts.md` | `packages/shared` is the only coupling between the two apps |

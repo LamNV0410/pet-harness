@@ -11,7 +11,7 @@
 | **D2** Rotate the committed secrets and move them out of the repos | OPEN | Safe M3 (agents reading product code); FE edits to env files (04 §8) | The deny and redact rules reduce exposure but don't remove it |
 | **D1** Authoritative `furwatch-app` branch | ACCEPTED (`origin/dev_v3`) | FE verification in M2; FE tasks in M4 | `frontend.md`: the source is only on `origin/dev_v3` |
 | **D5** Provider (TD-12: Claude Code CLI on the subscription) · CLI install | D5 ACCEPTED · CLI install OPEN | **M3** | VERIFIED: no `claude` CLI is on PATH; installing it is a gate-4 approval |
-| **D3** Product change for a side-effect-free local profile | OPEN | **M6** | `backend.md` §2, §4 |
+| **D3** How the API runs (TD-13: dev/test database from appsettings) | ACCEPTED | — | No product change needed. Each start needs approval |
 | D6, D10–D13 | ACCEPTED | M1–M3 as listed below | Design detail for those phases |
 | D14 / D15 | D14 ACCEPTED · D15 values OPEN | M5 (Office), M3 (budgets) | Not needed earlier |
 
@@ -28,7 +28,6 @@ flowchart LR
   D5{{D5}} -.-> M3
   D2{{D2}} -.-> M3
   D1{{D1}} -.-> M4
-  D3{{D3 + product WI}} -.-> M6
 ```
 
 | Phase | Scope | Exit criteria (evidence) | Owners |
@@ -39,7 +38,7 @@ flowchart LR
 | **M3 Agent loop (read-only)** | Executor port + Claude Code CLI executor (TD-12: spawn, stream-json parsing, PreToolUse policy hook, resume) + fake executor, the context builder, budgets, the Approval Center, run detail, the Requirement Inbox → BA run | A BA run turns an inbox item into `brief.md` with `path:line` citations. Every tool call is audited. The budget/turn stop and the fail-closed hook are tested with the fake executor and one real `claude -p` run. | BE, FE, Tester |
 | **M4 Write path** | `fs.write`/`fs.edit` in worktrees, `git.commit`, the diff view, task reports. The Orchestrator task DAG for single-repo tasks. | A BE run makes a small approved change with build and test evidence. Nothing is pushed. | BE, FE, Tester |
 | **M5 Workflow + UI suite** | The full work-item state machine and gates (03 §1), early test design, parallel tasks, the RC branch, the Kanban board, the agent dashboard, the Virtual Office (D14), crash resume | One work item goes from inbox to gate 4 with every gate in the Approval Center. Kill-and-resume is tested. | BE, FE, Tester, Release Manager |
-| **M6 Product runtime** | Isolated product servers, health probes, API checks | `furwatch-api` runs against LocalDB with no external side effects | Blocked on D3 |
+| **M6 Product runtime** | Start and stop `furwatch-api` on the dev/test database (TD-13), health probe, API checks, maximum runtime, start approval showing the side effects | The API starts after approval, passes the health check, and is stopped automatically. Every start is in the audit log | BE, FE, Tester |
 
 ## 3. Recommended next phase
 **M0, then M1.** M1 delivers the safety backbone before any model is connected:

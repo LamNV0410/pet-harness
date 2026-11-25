@@ -29,7 +29,7 @@ Follow the patterns that already exist. Introducing a new pattern needs a techni
 | Logging | Use `ILogger<T>` with message templates. No `Console.WriteLine`. Never log tokens, OTPs, emails or request bodies. |
 | Tests | Add or extend xUnit tests in `UrKnightAPI.Tests/<Area>/`, using EF InMemory and the existing `Fake*` classes. Tests must not use the network. |
 | Generated files | `*/Migrations/*.Designer.cs` and `ApplicationContextModelSnapshot.cs` are changed only by `dotnet ef` |
-| Running the API | Needs PO approval and an isolated local database. Startup seeds data, starts Hangfire and downloads Chromium (discovery `backend.md` §2) |
+| Running the API | Needs PO approval for every start. Only the Development profile, on the dev/test database (TD-13). Startup seeds data, starts Hangfire and downloads Chromium (discovery `backend.md` §2) |
 
 ## 3. Harness `apps/backend`
 The stack is undecided (D4). Until the Technical Blueprint is approved, no code goes here. These rules apply whatever the stack turns out to be:

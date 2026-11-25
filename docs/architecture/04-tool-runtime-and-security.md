@@ -96,7 +96,7 @@ flowchart TD
 | `test` | `dotnet test UrKnightAPI.sln`. INFERRED to have no side effects | `npx ng test --watch=false --browsers=ChromeHeadless`. UNKNOWN whether the specs compile |
 | `lint` | none configured | `npm run lint` |
 | `install` | `dotnet restore UrKnightAPI.sln` (ask) | `npm install --legacy-peer-deps` (ask; there is no lockfile) |
-| `run` | **disabled** until D3 is resolved (§7) | `npm run dev` (ask), port 4200 |
+| `run` | `dotnet run` with `ASPNETCORE_ENVIRONMENT=Development` on the dev/test database. **Every start needs PO approval**, with a short maximum runtime (§7, TD-13) | `npm run dev` (ask), port 4200 |
 | `health` | `GET /swagger/v1/swagger.json` (no health endpoint exists) | `GET /` |
 | `secretPaths` | `**/appsettings*.json`, `**/ServiceAccounts/**`, `**/Keys/**`, `**/*.pubxml.user` | `**/google-services.json`, `**/GoogleService-Info*.plist`, `src/environments/**`, `src/index.html`, `src/firebase-messaging-sw.js` |
 | `generated` (never edited) | `**/Migrations/*.Designer.cs`, `**/*ModelSnapshot.cs` | `android/**`, `ios/**`, `www/**`, `**/dist/**` |
@@ -106,17 +106,14 @@ flowchart TD
 - Every request needs a random bearer token, created at each start. It is stored in `.harness/session` and injected into the page the server serves.
 - The `Host` and `Origin` headers are checked against an allowlist. This blocks DNS rebinding and cross-site requests from other local web pages.
 
-## 7. Product runtime isolation (TD-07; depends on D3)
-- **What the Harness can do on its own:**
-  - give each workspace its own LocalDB database, set through `Sqlconnection__ConnectionString` and `Hangfire__ConnectionString` overrides;
-  - assign a Harness-owned port;
-  - withhold real external credentials.
-- **What it cannot do on its own:** stop the side effects that run on every startup (VERIFIED in `backend.md` §2 and §4):
-  - Hangfire jobs that send push notifications and email;
-  - seeding;
-  - the Chromium download;
-  - the Firebase service-account requirement.
-- **Proposal:** these need a product work item that adds a local profile with no side effects. That decision is D3, still OPEN. Until then, the API's `run` command stays disabled, and M6 is blocked.
+## 7. Product runtime (TD-13)
+- **Database:** `furwatch-api` runs with `ASPNETCORE_ENVIRONMENT=Development`, against the database already configured in `appsettings.Development.json`. The PO says it is a dev/test database (PO decision, 2026-11-25). The Harness never reads that file, and never starts the API with Stg or Prod configuration.
+- **Accepted side effects:** each start seeds the database and runs backfills. The Hangfire server joins the shared job storage, so reminder jobs may send real push notifications and emails. Firebase, SMTP and Blob storage use the real configuration. Chromium is downloaded at start-up.
+- **Controls:**
+  - every start needs its own approval, showing the branch, SHA and side effects;
+  - the process is stopped as soon as the checks are done, with a maximum runtime (D15);
+  - a health check probes `GET /swagger/v1/swagger.json`;
+  - applying migrations to the shared database is a separate gate action.
 
 ## 8. Risks and trade-offs
 | Risk | Position |

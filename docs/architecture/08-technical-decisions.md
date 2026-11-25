@@ -20,12 +20,13 @@ This file records the Harness technical decisions (TD). `open-decisions.md` trac
 | TD-04 | Backend↔frontend transport | D12 | ACCEPTED (PO, gate 2, 2026-11-25) |
 | TD-05 | Permission model | D6 | ACCEPTED (PO, gate 2, 2026-11-25) |
 | TD-06 | Model provider port and agent loop | D5 (mechanism only) | ACCEPTED (PO, gate 2, 2026-11-25). Its first adapter is SUPERSEDED by TD-12 |
-| TD-07 | Worktrees and product runtime isolation | D3 (Harness side) | ACCEPTED (PO, gate 2, 2026-11-25) |
+| TD-07 | Worktrees and product runtime isolation | D3 (Harness side) | ACCEPTED (PO, gate 2, 2026-11-25). Product-runtime part SUPERSEDED by TD-13 |
 | TD-08 | Workflow state, events and recovery | D13 | ACCEPTED (PO, gate 2, 2026-11-25) |
 | TD-09 | Cost controls | D15 (mechanism only) | ACCEPTED (PO, gate 2, 2026-11-25) |
 | TD-10 | One role definition for Claude Code and runtime | — | ACCEPTED (PO, gate 2, 2026-11-25) |
 | TD-11 | Virtual Office rendering | D14 | ACCEPTED (PO, gate 2, 2026-11-25) |
 | TD-12 | Claude Code CLI as the first agent executor (subscription, no API key) | D5 | ACCEPTED (PO, 2026-11-25). Replaces the first adapter of TD-06 |
+| TD-13 | furwatch-api runtime on the dev/test database from appsettings | D3 | ACCEPTED (PO, 2026-11-25). Replaces the product-runtime part of TD-07 |
 
 ---
 
@@ -231,6 +232,7 @@ This is so no hook stays open while waiting for a person; the default hook timeo
 - **Control.** Some loop behaviour, such as compaction and retries, belongs to Claude Code. TD-08 resume relies on Claude Code's local session store.
 
 ## TD-07 Worktrees and product runtime isolation (D3 Harness side)
+> The product-runtime part (LocalDB isolation, API disabled until D3) is **SUPERSEDED by TD-13** (2026-11-25). The worktree rules still apply.
 **Proposal**
 - **One worktree per task** (03 §4), created from the adapter's base ref, never from the PO's own checkout.
 - **Release candidates:** local `rc/WI-NNN` branches.
@@ -272,3 +274,29 @@ This is so no hook stays open while waiting for a person; the default hook timeo
 **Decision:** DOM/SVG with CSS animations, behind a renderer interface, as a pure projection of events with no LLM calls (doc 06).
 
 **Alternative:** a canvas/WebGL sprite engine, which could replace it later behind the same interface.
+
+## TD-13 furwatch-api runtime on the dev/test database (D3)
+**Status:** ACCEPTED (PO, 2026-11-25). Supersedes the product-runtime part of TD-07. TD-07's worktree rules still apply.
+
+**Context**
+- The PO decided that the Harness runs `furwatch-api` against the database already configured in `appsettings.Development.json`. There is no LocalDB isolation and no change to the product.
+- The PO states that this database is a **dev/test** database with no real users and may be written to. This comes from the PO and has not been verified by the Harness.
+- Before deciding, the PO was told about these side effects (VERIFIED in `backend.md` §2 and §4):
+  - every startup runs seeding and backfills;
+  - the local Hangfire server joins the shared job storage and may run the reminder jobs, which send real push notifications and email;
+  - Firebase, SMTP and Azure Blob use the real configuration;
+  - Chromium is downloaded on startup.
+
+**Decision**
+- **Profile:** `ASPNETCORE_ENVIRONMENT=Development` only, so the API uses `appsettings.Development.json`. The adapter never starts the API with Stg or Prod configuration.
+- **Approval:** every start is a gate action, approved separately by the PO (04 §3). The approval shows the branch, the commit SHA and the side effects listed above.
+- **Secrets:** the Harness never reads the appsettings files. The API reads its own configuration, and the Harness only passes the environment name and the port.
+- **Runtime limit:** the process is stopped as soon as the health check or the task's API checks are done. The default maximum runtime is short (proposed 15 minutes; the value belongs to D15). This keeps the time Hangfire is active short.
+- **Health check:** `GET /swagger/v1/swagger.json` on the assigned port, because the product has no health endpoint. Swagger is enabled in every environment (`backend.md` §2).
+- **Unreleased code:** starting the API from a task branch runs that branch's code against the shared database. The approval request must say this explicitly.
+
+**Consequences and risks**
+- **Unblocks M6.** No product work item is needed.
+- **Real recipients.** Reminder jobs may send real notifications to everyone in that database. This is acceptable only because the PO states it has no real users. If that changes, the decision must be revisited.
+- **Shared state.** Seeding, backfills and agent-driven API calls change shared data that other developers also use.
+- **Schema mismatch.** If a task branch adds a migration, the shared schema won't match it. The API does not run `Database.Migrate()`. Applying migrations to the shared database stays a separate gate action.

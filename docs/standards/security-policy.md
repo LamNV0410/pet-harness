@@ -34,7 +34,7 @@ Stop. Tell the PO which file or key name was exposed and where it went (output, 
 | Action | Rule |
 |---|---|
 | `dotnet build`, `dotnet test`, `npm run lint`, headless unit tests, `npm run build` | Allowed on a task branch |
-| `dotnet run` / starting `furwatch-api` | **PO approval.** It must point at an isolated local database through environment-variable overrides. Startup seeds data, runs Hangfire jobs (real push and email) and downloads Chromium. |
+| `dotnet run` / starting `furwatch-api` | **PO approval for every start.** Only with `ASPNETCORE_ENVIRONMENT=Development`, on the dev/test database in `appsettings.Development.json` (TD-13). Never Stg or Prod. Stop it as soon as the checks are done. Startup seeds data, runs Hangfire jobs (real push and email) and downloads Chromium. |
 | `dotnet ef database update`, any SQL against a non-local server | **PO approval**, per run |
 | `npm install`, `dotnet add package`, version bumps | **PO approval** (no lockfile; supply-chain risk) |
 | Calling real external services (Firebase, HitPay, SMTP, Azure Blob, Apple/Google, RapidAPI) | **PO approval**; prefer sandbox or fakes |
