@@ -30,7 +30,10 @@ let token = "";
 async function api(method, path, body) {
   const r = await fetch(base + path, {
     method,
-    headers: { authorization: `Bearer ${token}`, ...(body ? { "content-type": "application/json" } : {}) },
+    headers: {
+      authorization: `Bearer ${token}`,
+      ...(body ? { "content-type": "application/json" } : {}),
+    },
     body: body ? JSON.stringify(body) : undefined,
   });
   const j = await r.json();
@@ -53,17 +56,26 @@ const check = (name, ok, detail = "") => {
 };
 
 try {
-  await until("health", async () => {
-    try {
-      token = readFileSync(join(home, "session"), "utf8").trim();
-      return (await fetch(`${base}/api/health`, { headers: { authorization: `Bearer ${token}` } })).ok;
-    } catch {
-      return false;
-    }
-  }, 30_000);
+  await until(
+    "health",
+    async () => {
+      try {
+        token = readFileSync(join(home, "session"), "utf8").trim();
+        return (
+          await fetch(`${base}/api/health`, { headers: { authorization: `Bearer ${token}` } })
+        ).ok;
+      } catch {
+        return false;
+      }
+    },
+    30_000,
+  );
 
   // Hook fails closed.
-  const unknown = await api("POST", "/api/hooks/pretooluse?run=nope", { tool_name: "Read", tool_input: { file_path: "x" } });
+  const unknown = await api("POST", "/api/hooks/pretooluse?run=nope", {
+    tool_name: "Read",
+    tool_input: { file_path: "x" },
+  });
   check("hook denies an unknown run", unknown.hookSpecificOutput.permissionDecision === "deny");
 
   const { workItem } = await api("POST", "/api/workitems", {
@@ -76,41 +88,71 @@ try {
   const approveGate = async (gate) => {
     const a = await until(`${gate} approval`, async () => {
       const w = await stage();
-      if (w.status === "failed" || w.stage === "cancelled") throw new Error(`work item failed: ${JSON.stringify(w)}`);
+      if (w.status === "failed" || w.stage === "cancelled")
+        throw new Error(`work item failed: ${JSON.stringify(w)}`);
       const { approvals } = await api("GET", "/api/approvals?state=pending");
       const hit = approvals.find((x) => x.subjectId?.startsWith(`wi:${wid}`));
       return hit ? { ...hit, stage: w.stage } : null;
     });
     await api("POST", `/api/approvals/${a.id}/decide`, { decision: "approved" });
     console.log(`approved: ${a.title}`);
-    if (gate !== "gate" && a.kind === "gate" && a.stage !== gate) throw new Error(`expected ${gate}, got ${a.stage}`);
+    if (gate !== "gate" && a.kind === "gate" && a.stage !== gate)
+      throw new Error(`expected ${gate}, got ${a.stage}`);
     return a;
   };
 
   await approveGate("gate1");
   const d1 = await api("GET", `/api/workitems/${wid}`);
-  check("BA brief has a path:line citation", d1.artifacts.some((x) => x.kind === "brief" && /\w+\.\w+:\d+/.test(x.content)));
+  check(
+    "BA brief has a path:line citation",
+    d1.artifacts.some((x) => x.kind === "brief" && /\w+\.\w+:\d+/.test(x.content)),
+  );
   await approveGate("gate2");
   // Verify may ask for command approvals (approval: ask); approve until gate4 is reached.
   for (;;) {
     const a = await approveGate("gate");
     if (a.kind === "gate" && a.stage === "gate4") break;
   }
-  const w = await until("done", async () => ((await stage()).stage === "done" ? await stage() : null), 60_000);
+  const w = await until(
+    "done",
+    async () => ((await stage()).stage === "done" ? await stage() : null),
+    60_000,
+  );
   check("work item reaches done", w.stage === "done");
 
   const det = await api("GET", `/api/workitems/${wid}`);
-  check("task committed on a branch", det.tasks.every((t) => t.commit && t.branch));
+  check(
+    "task committed on a branch",
+    det.tasks.every((t) => t.commit && t.branch),
+  );
   const { agentRuns } = await api("GET", "/api/agent-runs");
-  check("agent runs recorded with usage", agentRuns.length >= 3 && agentRuns.every((r) => r.state === "succeeded" || r.state === "done" || r.costUsd !== null), `${agentRuns.length} runs`);
+  check(
+    "agent runs recorded with usage",
+    agentRuns.length >= 3 &&
+      agentRuns.every((r) => r.state === "succeeded" || r.state === "done" || r.costUsd !== null),
+    `${agentRuns.length} runs`,
+  );
 
   // Secret read through a real run id is denied and audited.
-  const sec = await api("POST", `/api/hooks/pretooluse?run=${agentRuns[0].id}`, { tool_name: "Read", tool_input: { file_path: join(root, "../furwatch-api/UrKnightAPI/appsettings.json") }, cwd: root });
-  check("hook denies a secret path", sec.hookSpecificOutput.permissionDecision === "deny", sec.hookSpecificOutput.permissionDecisionReason);
-  const bash = await api("POST", `/api/hooks/pretooluse?run=${agentRuns[0].id}`, { tool_name: "Bash", tool_input: { command: "ls" } });
+  const sec = await api("POST", `/api/hooks/pretooluse?run=${agentRuns[0].id}`, {
+    tool_name: "Read",
+    tool_input: { file_path: join(root, "../furwatch-api/UrKnightAPI/appsettings.json") },
+    cwd: root,
+  });
+  check(
+    "hook denies a secret path",
+    sec.hookSpecificOutput.permissionDecision === "deny",
+    sec.hookSpecificOutput.permissionDecisionReason,
+  );
+  const bash = await api("POST", `/api/hooks/pretooluse?run=${agentRuns[0].id}`, {
+    tool_name: "Bash",
+    tool_input: { command: "ls" },
+  });
   check("hook denies shell", bash.hookSpecificOutput.permissionDecision === "deny");
   const ev = await api("GET", "/api/events?limit=500").catch(() => ({ events: [] }));
-  const audited = (ev.events ?? []).filter((e) => e.type === "tool.requested" && String(e.payload?.tool).startsWith("claude.")).length;
+  const audited = (ev.events ?? []).filter(
+    (e) => e.type === "tool.requested" && String(e.payload?.tool).startsWith("claude."),
+  ).length;
   check("agent tool calls audited", audited >= 4, `${audited} tool.requested events`);
 } catch (e) {
   check("workflow", false, e.message);

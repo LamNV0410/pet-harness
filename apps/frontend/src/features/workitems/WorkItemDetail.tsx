@@ -1,8 +1,10 @@
 // One work item: stage track, gate decision, artifacts, tasks, agent runs, verification, diff.
+
 import { STAGES, workflowContracts as wc } from "@harness/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { call, contracts } from "../../api/client";
+import { Markdown } from "../../components/Markdown";
 import { ago, Panel, StatePill } from "../../components/ui";
 import { RunTable } from "../projects/ProjectDetail";
 
@@ -134,7 +136,7 @@ export function WorkItemDetail({ id }: { id: string }) {
             </span>
           }
         >
-          <pre className="md">{a.content}</pre>
+          <Markdown text={a.content} />
         </Panel>
       ))}
 
