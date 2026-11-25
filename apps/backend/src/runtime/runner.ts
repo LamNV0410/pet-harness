@@ -74,6 +74,8 @@ export class RunError extends Error {
 
 export class Runner {
   private readonly queue: { runId: string; rerun: boolean }[] = [];
+  private readonly preset = new Map<string, { path: string; sha: string }>();
+  private readonly waiters = new Map<string, ((r: CommandRun) => void)[]>();
   private readonly active = new Map<
     string,
     { projectId: string; proc: Spawned | null; cancelled: boolean }
@@ -189,6 +191,62 @@ export class Runner {
     return this.get(id) as CommandRun;
   }
 
+  /** M4: run a declared command inside an existing task worktree (no fetch, no cache, kept). */
+  startInWorktree(
+    projectId: string,
+    commandId: string,
+    worktree: string,
+    sha: string,
+    workItemId: string,
+  ): CommandRun {
+    const adapter = this.projects.adapter(projectId);
+    const cmd = adapter?.commands[commandId];
+    if (!adapter || !cmd)
+      throw new RunError("VALIDATION_FAILED", `command "${commandId}" is not declared`);
+    const id = randomUUID();
+    this.store.transaction((tx) => {
+      tx.db
+        .prepare(
+          `INSERT INTO command_runs (id, project_id, command_id, argv, base_ref, sha, state, fetch, keep_worktree, worktree, work_item_id, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, 'queued', 0, 1, ?, ?, ?)`,
+        )
+        .run(
+          id,
+          projectId,
+          commandId,
+          JSON.stringify(cmd.argv),
+          adapter.baseRef,
+          sha,
+          worktree,
+          workItemId,
+          new Date().toISOString(),
+        );
+      tx.emit(
+        "run.state_changed",
+        "tester",
+        { runId: id, projectId, commandId, state: "queued", sha, exitCode: null, summary: null },
+        { correlationId: workItemId },
+      );
+    });
+    this.preset.set(id, { path: worktree, sha });
+    this.enqueue(id, true);
+    return this.get(id) as CommandRun;
+  }
+
+  waitFor(id: string): Promise<CommandRun> {
+    const r = this.get(id);
+    if (r && FINAL_RUN_STATES.includes(r.state)) return Promise.resolve(r);
+    return new Promise((res) => this.waiters.set(id, [...(this.waiters.get(id) ?? []), res]));
+  }
+
+  listForWorkItem(workItemId: string): CommandRun[] {
+    return (
+      this.store.db
+        .prepare("SELECT * FROM command_runs WHERE work_item_id = ? ORDER BY created_at")
+        .all(workItemId) as unknown as Row[]
+    ).map(toRun);
+  }
+
   cancel(id: string): CommandRun {
     const run = this.get(id);
     if (!run) throw new RunError("NOT_FOUND", "unknown run");
@@ -289,56 +347,67 @@ export class Runner {
       return this.finish(run.id, "error", null, "project or command disappeared", null);
     const t0 = Date.now();
     let worktree: string | null = null;
+    let ownWorktree = false;
     this.setState(run.id, "preparing");
     try {
-      if (run.fetch) {
-        this.log(run.id, `[harness] git fetch origin (${run.projectId})`);
-        await fetchOrigin(scope.root).catch((e: Error) =>
-          this.log(run.id, `[harness] fetch failed, using local refs: ${e.message}`),
-        );
-      }
-      const sha = await resolveSha(scope.root, adapter.baseRef);
-      this.setState(run.id, "preparing", { sha });
-      this.log(run.id, `[harness] ${adapter.baseRef} = ${sha}`);
-
-      if (!rerun) {
-        const v = this.store.db
-          .prepare(
-            "SELECT run_id, state, summary FROM verdicts WHERE project_id = ? AND sha = ? AND command_id = ?",
-          )
-          .get(run.projectId, sha, run.commandId) as
-          | { run_id: string; state: string; summary: string | null }
-          | undefined;
-        if (v) {
-          this.log(
-            run.id,
-            `[harness] verdict already stored for this commit (${v.state}); not re-running`,
-          );
-          this.store.db
-            .prepare("UPDATE command_runs SET cached_from = ? WHERE id = ?")
-            .run(v.run_id, run.id);
-          return this.finish(
-            run.id,
-            "cached",
-            null,
-            `${v.state}: ${v.summary ?? ""}`.trim(),
-            Date.now() - t0,
+      const pre = this.preset.get(run.id);
+      if (pre) {
+        worktree = pre.path;
+        this.setState(run.id, "preparing", { sha: pre.sha });
+        this.log(run.id, `[harness] using task worktree at ${pre.sha.slice(0, 10)}`);
+      } else {
+        if (run.fetch) {
+          this.log(run.id, `[harness] git fetch origin (${run.projectId})`);
+          await fetchOrigin(scope.root).catch((e: Error) =>
+            this.log(run.id, `[harness] fetch failed, using local refs: ${e.message}`),
           );
         }
-      }
-      if (this.active.get(run.id)?.cancelled)
-        return this.finish(run.id, "cancelled", null, "cancelled", Date.now() - t0);
+        const sha = await resolveSha(scope.root, adapter.baseRef);
+        this.setState(run.id, "preparing", { sha });
+        this.log(run.id, `[harness] ${adapter.baseRef} = ${sha}`);
 
-      this.log(run.id, `[harness] creating worktree at ${sha.slice(0, 10)}`);
-      worktree = await addWorktree(
-        scope.root,
-        join(this.worktreesDir, run.projectId),
-        run.id.slice(0, 8),
-        sha,
-      );
-      this.store.db
-        .prepare("UPDATE command_runs SET worktree = ? WHERE id = ?")
-        .run(worktree, run.id);
+        if (!rerun) {
+          const v = this.store.db
+            .prepare(
+              "SELECT run_id, state, summary FROM verdicts WHERE project_id = ? AND sha = ? AND command_id = ?",
+            )
+            .get(run.projectId, sha, run.commandId) as
+            | { run_id: string; state: string; summary: string | null }
+            | undefined;
+          if (v) {
+            this.log(
+              run.id,
+              `[harness] verdict already stored for this commit (${v.state}); not re-running`,
+            );
+            this.store.db
+              .prepare("UPDATE command_runs SET cached_from = ? WHERE id = ?")
+              .run(v.run_id, run.id);
+            return this.finish(
+              run.id,
+              "cached",
+              null,
+              `${v.state}: ${v.summary ?? ""}`.trim(),
+              Date.now() - t0,
+            );
+          }
+        }
+        if (this.active.get(run.id)?.cancelled)
+          return this.finish(run.id, "cancelled", null, "cancelled", Date.now() - t0);
+
+        this.log(run.id, `[harness] creating worktree at ${sha.slice(0, 10)}`);
+        worktree = await addWorktree(
+          scope.root,
+          join(this.worktreesDir, run.projectId),
+          run.id.slice(0, 8),
+          sha,
+        );
+        this.store.db
+          .prepare("UPDATE command_runs SET worktree = ? WHERE id = ?")
+          .run(worktree, run.id);
+        ownWorktree = true;
+      }
+      const sha = (this.get(run.id)?.sha ?? "") as string;
+      if (!worktree) throw new Error("no worktree");
 
       const resolved = resolveArgv(cmd.argv, cmd.toolchain, this.toolchains);
       this.setState(run.id, "running");
@@ -376,7 +445,8 @@ export class Runner {
       this.log(run.id, `[harness] error: ${msg}`);
       this.finish(run.id, "error", null, msg.slice(0, 300), Date.now() - t0);
     } finally {
-      if (worktree && !run.keepWorktree) {
+      this.preset.delete(run.id);
+      if (worktree && ownWorktree && !run.keepWorktree) {
         await removeWorktree(scope.root, worktree).catch((e: Error) =>
           this.logger.warn("worktree cleanup failed", { error: e.message }),
         );
@@ -458,6 +528,9 @@ export class Runner {
       );
     });
     for (const cb of this.logSubs.get(id) ?? []) cb(null);
+    const done = this.get(id);
+    if (done) for (const w of this.waiters.get(id) ?? []) w(done);
+    this.waiters.delete(id);
     this.logSubs.delete(id);
     this.logger.info("run.finished", { runId: id, state, exitCode, durationMs });
   }

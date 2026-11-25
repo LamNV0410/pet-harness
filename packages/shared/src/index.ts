@@ -4,3 +4,4 @@ export * from "./domain/index.js";
 export * from "./errors/index.js";
 export * from "./events/index.js";
 export { buildOpenApiDocument } from "./openapi.js";
+export * from "./workflow/index.js";

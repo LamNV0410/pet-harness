@@ -1,7 +1,8 @@
 // Builds an OpenAPI 3.1 document from the contracts (design.md §4, TD-02). Pure: no I/O.
 import { z } from "zod";
-import { contracts } from "./contracts/index.js";
+import { type ContractDef, contracts } from "./contracts/index.js";
 import { ErrorBody } from "./errors/index.js";
+import { workflowContracts } from "./workflow/index.js";
 
 const STATUS_OF: Record<string, string> = {
   UNAUTHORIZED: "401",
@@ -16,7 +17,8 @@ const schema = (s: z.ZodType) => z.toJSONSchema(s, { unrepresentable: "any", io:
 
 export function buildOpenApiDocument(version: string): Record<string, unknown> {
   const paths: Record<string, Record<string, unknown>> = {};
-  for (const c of Object.values(contracts)) {
+  const all: ContractDef[] = [...Object.values(contracts), ...Object.values(workflowContracts)];
+  for (const c of all) {
     const oaPath = c.path.replace(/:([A-Za-z]+)/g, "{$1}");
     const responses: Record<string, unknown> = {
       "200": {

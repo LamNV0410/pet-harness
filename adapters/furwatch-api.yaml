@@ -20,6 +20,7 @@ commands:
     argv: [dotnet, run, --project, UrKnightAPI, --launch-profile, http]
     env: { ASPNETCORE_ENVIRONMENT: Development }
     approval: ask # every start needs PO approval (TD-13)
+    port: 7149
     maxRuntimeMinutes: 15 # value pending D15
 health:
   path: /swagger/v1/swagger.json

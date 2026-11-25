@@ -2,9 +2,12 @@
 // 1 open DB + migrate · 2 session token · 3 policy + adapters · 4 system.started · 5 listen on 127.0.0.1
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { AgentExecutor } from "./agents/executor.js";
+import { AgentHook } from "./agents/hook.js";
 import { buildApp } from "./api/index.js";
 import { runRoutes } from "./api/runs.js";
 import { loadOrCreateToken } from "./api/security.js";
+import { workflowRoutes } from "./api/workflow.js";
 import { ApprovalService } from "./approvals/index.js";
 import { loadConfig } from "./config/index.js";
 import { Logger } from "./logger.js";
@@ -13,8 +16,10 @@ import { redact } from "./permissions/redactor.js";
 import { ProjectRegistry } from "./projects/index.js";
 import { detectToolchains } from "./runtime/process.js";
 import { Runner } from "./runtime/runner.js";
+import { ServerManager } from "./runtime/servers.js";
 import { Store } from "./store/index.js";
 import { ToolService } from "./tools/service.js";
+import { Workflow } from "./workflow/engine.js";
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -37,6 +42,26 @@ async function main(): Promise<void> {
   runner.recover();
 
   let port = config.port;
+  const toolchains = detectToolchains();
+  const executor = new AgentExecutor(
+    store,
+    logger,
+    config.home,
+    () => `http://127.0.0.1:${port}/api/hooks/pretooluse`,
+    token,
+  );
+  const hook = new AgentHook(store, projects, executor);
+  const workflow = new Workflow(
+    store,
+    projects,
+    runner,
+    approvals,
+    executor,
+    logger,
+    config.harnessRoot,
+    config.home,
+  );
+  const servers = new ServerManager(store, projects, approvals, logger, toolchains, config.home);
   const app = buildApp({
     config,
     store,
@@ -45,7 +70,10 @@ async function main(): Promise<void> {
     logger,
     token,
     port: () => port,
-    modules: [runRoutes(runner, approvals)],
+    modules: [
+      runRoutes(runner, approvals),
+      workflowRoutes({ workflow, hook, approvals, runner, servers, store }),
+    ],
   });
   await app.listen({ host: "127.0.0.1", port: config.port });
   const addr = app.server.address();
@@ -60,6 +88,7 @@ async function main(): Promise<void> {
     ),
   );
   store.transaction((tx) => tx.emit("system.started", "system", { version: config.version }));
+  workflow.recover();
   logger.info("started", {
     port,
     projects: loaded.projects.length,
@@ -75,6 +104,7 @@ async function main(): Promise<void> {
     console.log(`Rejected adapters: ${loaded.rejected.map((r) => r.file).join(", ")}`);
 
   const shutdown = async () => {
+    servers.stopAll();
     await app.close();
     store.close();
     process.exit(0);
