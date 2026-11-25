@@ -1,6 +1,7 @@
 // Virtual Office (06): a pure projection of real events. No AI calls, no invented text.
 import type { HarnessEvent } from "@harness/shared";
 import { useMemo, useState } from "react";
+import { OfficeScene } from "./OfficeScene";
 
 type DeskState =
   | "idle"
@@ -12,7 +13,7 @@ type DeskState =
   | "blocked"
   | "done";
 
-interface Desk {
+export interface DeskView {
   id: string;
   name: string;
   ini: string;
@@ -34,8 +35,8 @@ const ROLES: { id: string; name: string; ini: string }[] = [
 ];
 
 /** Replays events (oldest first) into one state per desk. */
-export function project(eventsNewestFirst: HarnessEvent[]): Desk[] {
-  const desks = new Map<string, Desk>(
+export function project(eventsNewestFirst: HarnessEvent[]): DeskView[] {
+  const desks = new Map<string, DeskView>(
     ROLES.map((r) => [r.id, { ...r, state: "idle" as DeskState, say: "—", link: null, at: null }]),
   );
   const pending = new Map<string, string>();
@@ -117,15 +118,6 @@ export function project(eventsNewestFirst: HarnessEvent[]): Desk[] {
   return [...desks.values()];
 }
 
-const PROP: Partial<Record<DeskState, string>> = {
-  reading: "R",
-  editing: "E",
-  building: "⚙",
-  waiting: "✋",
-  blocked: "!",
-  done: "✓",
-};
-
 export function OfficeView({ events }: { events: HarnessEvent[] }) {
   const desks = useMemo(() => project(events), [events]);
   const [list, setList] = useState(false);
@@ -153,24 +145,7 @@ export function OfficeView({ events }: { events: HarnessEvent[] }) {
           </tbody>
         </table>
       ) : (
-        <div className="office">
-          {desks.map((d) => (
-            <a
-              key={d.id}
-              className={`desk ${d.id === "po" ? "po" : ""}`}
-              data-state={d.state}
-              href={d.link ?? undefined}
-            >
-              <div className="avatar">
-                {d.ini}
-                {PROP[d.state] && <span className="prop">{PROP[d.state]}</span>}
-              </div>
-              <div className="role">{d.name}</div>
-              <div className="state mono">{d.state}</div>
-              <div className="bubble">{d.say}</div>
-            </a>
-          ))}
-        </div>
+        <OfficeScene desks={desks} />
       )}
       <div className="legend">
         <span className="l-idle">idle</span>
