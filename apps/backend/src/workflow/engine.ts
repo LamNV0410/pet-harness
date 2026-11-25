@@ -494,7 +494,8 @@ export class Workflow {
         await fetchOrigin(scope.root).catch(() => undefined);
         base = await resolveSha(scope.root, adapter.baseRef);
       }
-      const branch = t.branch ?? `fw/${t.id.toLowerCase()}`;
+      const branch =
+        t.branch ?? `${process.env.HARNESS_BRANCH_PREFIX ?? "fw/"}${t.id.toLowerCase()}`;
       const wt = await addBranchWorktree(
         scope.root,
         join(this.home, "worktrees", t.projectId),
@@ -612,7 +613,9 @@ export class Workflow {
       await removeWorktree(
         scope.root,
         join(this.home, "worktrees", wi.projectId, `${id.toLowerCase()}-ro`),
-      ).catch(() => undefined);
+      ).catch((e: unknown) =>
+        this.logger.warn("cleanup.failed", { workItemId: id, error: (e as Error).message }),
+      );
     for (const t of this.tasks(id)) {
       const s = this.projects.scope(t.projectId);
       const wt = (
@@ -620,7 +623,10 @@ export class Workflow {
           worktree: string | null;
         }
       ).worktree;
-      if (s && wt) await removeWorktree(s.root, wt).catch(() => undefined); // the branch stays
+      if (s && wt)
+        await removeWorktree(s.root, wt).catch((e: unknown) =>
+          this.logger.warn("cleanup.failed", { taskId: t.id, error: (e as Error).message }),
+        ); // the branch stays
     }
   }
 
